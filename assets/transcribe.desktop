@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Transcribe
+Comment=Voice transcription with Nvidia Parakeet
+Icon=transcribe
+Exec=PLACEHOLDER
+Terminal=false
+Categories=AudioVideo;Audio;Utility;
+Keywords=voice;transcription;speech;dictation;
+StartupNotify=false

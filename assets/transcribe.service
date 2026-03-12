@@ -1,0 +1,18 @@
+[Unit]
+Description=Voice Transcription Service (Parakeet)
+Documentation=https://github.com/martin/transcribe
+After=graphical-session.target
+PartOf=graphical-session.target
+Requisite=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=PLACEHOLDER
+Restart=on-failure
+RestartSec=5
+
+# Pass through display environment for X11/clipboard/notifications
+Environment=DISPLAY=:0
+
+[Install]
+WantedBy=graphical-session.target
