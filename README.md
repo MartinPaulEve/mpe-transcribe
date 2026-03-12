@@ -1,4 +1,4 @@
-# transcribe
+# mpe-transcribe
 
 Local voice transcription for Ubuntu/GNOME on X11. Press a global hotkey to start recording, press it again to stop. The audio is transcribed on-device using an Nvidia Parakeet ASR model running on your GPU, and the resulting text is pasted into the active application.
 
