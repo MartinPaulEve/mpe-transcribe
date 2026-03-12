@@ -72,7 +72,10 @@ class HotkeyListener:
         while self._running:
             event = self._display.next_event()
             if event.type == X.KeyPress:
-                self._callback()
+                # Fire callback in a separate thread so the
+                # X event loop is never blocked by slow work
+                # (notifications, audio, transcription).
+                threading.Thread(target=self._callback, daemon=True).start()
 
     def stop(self):
         self._running = False

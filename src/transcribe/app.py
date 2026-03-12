@@ -45,13 +45,22 @@ class TranscribeApp:
                 self._stop_and_transcribe()
 
     def _start_recording(self):
+        self._notifier.notify_and_ding("Transcribe", "Recording...")
         self._recorder.start()
         self._state = AppState.RECORDING
-        self._notifier.notify_and_ding("Transcribe", "Recording...")
         logger.info("Recording started")
 
     def _stop_and_transcribe(self):
         audio = self._recorder.stop()
+        logger.info(
+            "Captured %d samples (%.1fs)",
+            len(audio),
+            len(audio) / 16000,
+        )
+        if len(audio) == 0:
+            self._notifier.notify("Transcribe", "Recording too short")
+            self._state = AppState.IDLE
+            return
         self._state = AppState.TRANSCRIBING
         self._notifier.notify_and_ding("Transcribe", "Transcribing...")
         logger.info("Recording stopped, transcribing...")

@@ -95,6 +95,19 @@ class TestApp:
         assert app.state == AppState.IDLE
         mock_cb.paste_text.assert_not_called()
 
+    def test_empty_audio_returns_to_idle(self):
+        app, mock_rec, mock_trans, _, mock_notif, _ = self._make_app()
+        mock_rec.stop.return_value = np.array([], dtype=np.float32)
+
+        app.toggle()  # IDLE -> RECORDING
+        app.toggle()  # RECORDING -> IDLE (too short)
+
+        assert app.state == AppState.IDLE
+        mock_trans.transcribe.assert_not_called()
+        mock_notif.notify.assert_called_once_with(
+            "Transcribe", "Recording too short"
+        )
+
     def test_shutdown_stops_hotkey(self):
         app, _, _, mock_hk, _, _ = self._make_app()
         app.shutdown()
