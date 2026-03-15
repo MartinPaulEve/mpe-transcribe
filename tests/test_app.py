@@ -108,6 +108,19 @@ class TestApp:
             "Transcribe", "Recording too short"
         )
 
+    def test_run_notifies_when_ready(self):
+        app, _, mock_trans, mock_hk, mock_notif, _ = self._make_app()
+
+        # Make signal.pause raise immediately so run() returns
+        with patch("transcribe.app.signal") as mock_signal:
+            mock_signal.pause.side_effect = KeyboardInterrupt
+            app.run()
+
+        mock_trans.load_model.assert_called_once()
+        mock_notif.notify_and_ding.assert_called_once_with(
+            "Transcribe", "Ready"
+        )
+
     def test_shutdown_stops_hotkey(self):
         app, _, _, mock_hk, _, _ = self._make_app()
         app.shutdown()

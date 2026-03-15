@@ -88,6 +88,7 @@ class TranscribeApp:
         logger.info("Hotkey: %s", self._config["hotkey"])
         logger.info("Loading model...")
         self._transcriber.load_model()
+        self._notifier.notify_and_ding("Transcribe", "Ready")
         logger.info(
             "Ready. Press %s to toggle recording. Ctrl+C to quit.",
             self._config["hotkey"],
