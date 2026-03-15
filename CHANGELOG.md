@@ -1,3 +1,9 @@
+## 1.3.0 (2026-03-15)
+
+### Feat
+
+- **wayland**: add experimental Wayland support via evdev and ydotool
+
 ## 1.2.0 (2026-03-15)
 
 ### Feat
