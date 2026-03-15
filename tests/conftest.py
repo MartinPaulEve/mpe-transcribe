@@ -40,3 +40,33 @@ sys.modules["nemo.collections.asr"] = _mock_nemo.collections.asr
 # Mock soundfile
 _mock_sf = MagicMock()
 sys.modules["soundfile"] = _mock_sf
+
+# Mock evdev modules with real key constants so that wayland_hotkey.py
+# works correctly at import time.
+_mock_evdev = MagicMock()
+_mock_ecodes = MagicMock()
+_mock_ecodes.KEY_LEFTCTRL = 29
+_mock_ecodes.KEY_RIGHTCTRL = 97
+_mock_ecodes.KEY_LEFTSHIFT = 42
+_mock_ecodes.KEY_RIGHTSHIFT = 54
+_mock_ecodes.KEY_LEFTALT = 56
+_mock_ecodes.KEY_RIGHTALT = 100
+_mock_ecodes.KEY_LEFTMETA = 125
+_mock_ecodes.KEY_RIGHTMETA = 126
+_mock_ecodes.KEY_SEMICOLON = 39
+_mock_ecodes.KEY_APOSTROPHE = 40
+_mock_ecodes.KEY_COMMA = 51
+_mock_ecodes.KEY_DOT = 52
+_mock_ecodes.KEY_SLASH = 53
+_mock_ecodes.KEY_BACKSLASH = 43
+_mock_ecodes.KEY_LEFTBRACE = 26
+_mock_ecodes.KEY_RIGHTBRACE = 27
+_mock_ecodes.KEY_MINUS = 12
+_mock_ecodes.KEY_EQUAL = 13
+_mock_ecodes.KEY_GRAVE = 41
+_mock_ecodes.KEY_A = 30
+_mock_ecodes.KEY_Z = 44
+_mock_ecodes.EV_KEY = 1
+_mock_evdev.ecodes = _mock_ecodes
+sys.modules["evdev"] = _mock_evdev
+sys.modules["evdev.ecodes"] = _mock_ecodes

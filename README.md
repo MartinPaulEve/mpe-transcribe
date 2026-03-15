@@ -1,6 +1,8 @@
 # mpe-transcribe
 
-Local voice transcription for Ubuntu/GNOME on X11. Press a global hotkey to start recording, press it again to stop. The audio is transcribed on-device using an Nvidia Parakeet ASR model running on your GPU, and the resulting text is pasted into the active application.
+Local voice transcription for Ubuntu/GNOME. Press a global hotkey to start recording, press it again to stop. The audio is transcribed on-device using an Nvidia Parakeet ASR model running on your GPU, and the resulting text is pasted into the active application.
+
+The app auto-detects whether you are running X11 or Wayland and uses the appropriate backend. X11 is the primary, well-tested path. Wayland support is new and untested in production — if you'd like to try it, please do and report any issues so we can refine it.
 
 ## System requirements
 
@@ -12,15 +14,14 @@ Local voice transcription for Ubuntu/GNOME on X11. Press a global hotkey to star
 
 ### Software
 
-- **OS:** Ubuntu 22.04+ (or any Linux distro with X11 and systemd)
-- **Display server:** X11 (Wayland is not supported — XGrabKey and xdotool require X11)
+- **OS:** Ubuntu 22.04+ (or any Linux distro with systemd)
 - **Python:** 3.12+
 - **NVIDIA driver:** 525+ with CUDA 11.8+ (PyTorch will pull its own CUDA runtime via pip)
 - **uv:** 0.4+ (for dependency management)
 
-### System packages
+### System packages — X11
 
-Install these via `apt` before proceeding:
+X11 is the primary display server target and where all testing has been done. Install these via `apt`:
 
 ```bash
 sudo apt install libportaudio2 xdotool xclip libnotify-bin
@@ -32,6 +33,40 @@ sudo apt install libportaudio2 xdotool xclip libnotify-bin
 | `xdotool` | Simulates Ctrl+V paste into the active window |
 | `xclip` | Sets/reads the X11 clipboard |
 | `libnotify-bin` | Provides `notify-send` for desktop notifications |
+
+### System packages — Wayland (experimental)
+
+Wayland support is experimental and has not been tested in production. If you are running a Wayland session (e.g. Ubuntu 24.04+ defaults to Wayland on GNOME), the app will auto-detect it and use the Wayland backend. You will need different system packages:
+
+```bash
+sudo apt install libportaudio2 wl-clipboard ydotool libnotify-bin
+```
+
+| Package | Purpose |
+|---|---|
+| `libportaudio2` | Audio I/O backend for `sounddevice` |
+| `wl-clipboard` | Provides `wl-copy`/`wl-paste` for Wayland clipboard access |
+| `ydotool` | Simulates key release and Ctrl+V paste via the kernel input layer |
+| `libnotify-bin` | Provides `notify-send` for desktop notifications |
+
+**Additional Wayland setup:**
+
+1. **`input` group membership** — The Wayland hotkey listener reads keyboard events via evdev, which requires permission to access `/dev/input/` devices. Add your user to the `input` group:
+
+   ```bash
+   sudo usermod -aG input $USER
+   ```
+
+   Then log out and back in for the group change to take effect.
+
+2. **`ydotoold` daemon** — `ydotool` requires its daemon to be running. Enable and start it:
+
+   ```bash
+   sudo systemctl enable ydotoold
+   sudo systemctl start ydotoold
+   ```
+
+If you run into problems with the Wayland backend, please open an issue. We are actively looking for feedback to stabilise this path.
 
 ## Installation
 
@@ -149,7 +184,7 @@ This installs a git pre-commit hook that automatically runs Ruff linting (with `
 uv run pytest -v
 ```
 
-All external dependencies (sounddevice, Xlib, NeMo, xclip, xdotool) are mocked in the test suite, so tests run on any machine without GPU, X11, or audio hardware.
+All external dependencies (sounddevice, Xlib, evdev, NeMo, xclip, xdotool) are mocked in the test suite, so tests run on any machine without GPU, X11, Wayland, or audio hardware.
 
 ### Linting and formatting
 
@@ -172,7 +207,7 @@ A separate workflow (`.github/workflows/version-release.yml`) auto-bumps the ver
 
 ## Architecture
 
-The app is a state machine:
+The app is a state machine with auto-detected display server backends:
 
 ```
 IDLE ──[hotkey]──> RECORDING ──[hotkey]──> TRANSCRIBING ──[done]──> IDLE
@@ -183,11 +218,15 @@ IDLE ──[hotkey]──> RECORDING ──[hotkey]──> TRANSCRIBING ──[d
 | Module | Responsibility |
 |---|---|
 | `app.py` | State machine orchestrator |
+| `session.py` | Detects X11 vs Wayland session |
+| `factory.py` | Creates the correct hotkey/clipboard backend for the session |
 | `recorder.py` | 16 kHz mono audio capture via PortAudio |
 | `transcriber.py` | NeMo Parakeet model inference |
-| `hotkey.py` | Global hotkey via X11 `XGrabKey` (suppresses key from reaching apps) |
+| `hotkey.py` | X11: global hotkey via `XGrabKey` |
+| `wayland_hotkey.py` | Wayland: global hotkey via evdev (experimental) |
 | `notifier.py` | Desktop notifications + audible ding |
-| `clipboard.py` | Clipboard save/set/paste/restore via xclip + xdotool |
+| `clipboard.py` | X11: clipboard save/set/paste/restore via xclip + xdotool |
+| `wayland_clipboard.py` | Wayland: clipboard via wl-clipboard + ydotool (experimental) |
 | `config.py` | Reads `[tool.transcribe]` from pyproject.toml |
 
 ## Troubleshooting
@@ -197,11 +236,20 @@ IDLE ──[hotkey]──> RECORDING ──[hotkey]──> TRANSCRIBING ──[d
 sudo apt install libportaudio2
 ```
 
-**Hotkey not working** — Ensure you are running X11, not Wayland. Check with:
+**Hotkey not working (X11)** — Check you are running X11:
 ```bash
 echo $XDG_SESSION_TYPE   # should print "x11"
 ```
 If another application has already grabbed the same key combination, `XGrabKey` will silently fail. Try a different hotkey in `pyproject.toml`.
+
+**Hotkey not working (Wayland)** — Ensure your user is in the `input` group:
+```bash
+groups   # should include "input"
+```
+If not, add yourself (`sudo usermod -aG input $USER`) and log out/in. Also check that `ydotoold` is running:
+```bash
+systemctl status ydotoold
+```
 
 **Model download hangs** — The first run downloads ~1.2 GB from NVIDIA NGC. Check your internet connection and firewall rules. The model is cached in `~/.cache/torch/NeMo/` after the first download.
 

@@ -1,5 +1,5 @@
 import time
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 
@@ -13,21 +13,29 @@ class TestApp:
     }
 
     def _make_app(self):
+        mock_hk = MagicMock()
+        mock_cb = MagicMock()
         with (
             patch("transcribe.app.AudioRecorder") as mock_rec_cls,
             patch("transcribe.app.Transcriber") as mock_trans_cls,
-            patch("transcribe.app.HotkeyListener") as mock_hk_cls,
+            patch(
+                "transcribe.app.create_hotkey_listener",
+                return_value=mock_hk,
+            ),
             patch("transcribe.app.AppNotifier") as mock_notif_cls,
-            patch("transcribe.app.Clipboard") as mock_cb_cls,
+            patch(
+                "transcribe.app.create_clipboard",
+                return_value=mock_cb,
+            ),
         ):
             app = TranscribeApp(config=self.TEST_CONFIG)
             return (
                 app,
                 mock_rec_cls.return_value,
                 mock_trans_cls.return_value,
-                mock_hk_cls.return_value,
+                mock_hk,
                 mock_notif_cls.return_value,
-                mock_cb_cls.return_value,
+                mock_cb,
             )
 
     def test_initial_state_is_idle(self):

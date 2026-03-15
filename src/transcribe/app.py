@@ -3,9 +3,8 @@ import signal
 import threading
 from enum import Enum
 
-from transcribe.clipboard import Clipboard
 from transcribe.config import load_config, parse_hotkey
-from transcribe.hotkey import HotkeyListener
+from transcribe.factory import create_clipboard, create_hotkey_listener
 from transcribe.notifier import AppNotifier
 from transcribe.recorder import AudioRecorder
 from transcribe.transcriber import Transcriber
@@ -26,11 +25,11 @@ class TranscribeApp:
         self._recorder = AudioRecorder()
         self._transcriber = Transcriber(model_name=self._config["model"])
         modifiers, key = parse_hotkey(self._config["hotkey"])
-        self._hotkey = HotkeyListener(
+        self._hotkey = create_hotkey_listener(
             self.toggle, modifiers=modifiers, key=key
         )
         self._notifier = AppNotifier()
-        self._clipboard = Clipboard()
+        self._clipboard = create_clipboard()
         self._lock = threading.Lock()
 
     @property

@@ -10,6 +10,7 @@ dependencies = [
     "numpy",
     "scipy",
     "python-xlib",
+    "evdev",
 ]
 
 [project.scripts]
