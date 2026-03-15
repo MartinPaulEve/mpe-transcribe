@@ -1,7 +1,12 @@
 import threading
+import time
 
 from Xlib import XK, X
 from Xlib import display as xdisplay
+
+# Minimum interval between accepted hotkey presses (seconds).
+# Suppresses X11 auto-repeat duplicates.
+_DEBOUNCE_SECONDS = 0.3
 
 MODIFIER_MASKS = {
     "ctrl": X.ControlMask,
@@ -37,6 +42,7 @@ class HotkeyListener:
         self._thread = None
         self._display = None
         self._running = False
+        self._last_press = 0.0
 
     def start(self):
         self._running = True
@@ -72,6 +78,10 @@ class HotkeyListener:
         while self._running:
             event = self._display.next_event()
             if event.type == X.KeyPress:
+                now = time.monotonic()
+                if now - self._last_press < _DEBOUNCE_SECONDS:
+                    continue
+                self._last_press = now
                 # Fire callback in a separate thread so the
                 # X event loop is never blocked by slow work
                 # (notifications, audio, transcription).

@@ -133,3 +133,79 @@ class TestHotkeyListener:
         t.join(timeout=1)
 
         callback.assert_not_called()
+
+    def test_rapid_keypresses_debounced(self):
+        """Auto-repeat KeyPress events are ignored."""
+        # Simulate 3 rapid KeyPress events (as X11 auto-repeat would generate)
+        events = [MagicMock(type=2) for _ in range(3)]
+        mock_display, _ = _make_mock_display(events)
+
+        callback = MagicMock()
+        listener = HotkeyListener(callback, modifiers={"ctrl"}, key="a")
+
+        import threading
+        import time
+
+        def run():
+            with patch(
+                "transcribe.hotkey.xdisplay.Display", return_value=mock_display
+            ):
+                listener._run()
+
+        listener._running = True
+        t = threading.Thread(target=run)
+        t.start()
+        time.sleep(0.1)
+        listener._running = False
+        t.join(timeout=1)
+
+        # Only the first keypress should fire; the rest are debounced
+        callback.assert_called_once()
+
+    def test_keypress_after_debounce_window_fires(self):
+        """A KeyPress after the debounce window should fire the callback."""
+        import threading
+        import time
+
+        callback = MagicMock()
+        listener = HotkeyListener(callback, modifiers={"ctrl"}, key="a")
+
+        # We'll manually drive the debounce logic by simulating events
+        # with a delay between them that exceeds the debounce window
+        event1 = MagicMock(type=2)
+        event2 = MagicMock(type=2)
+        call_count = 0
+
+        def next_event():
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return event1
+            elif call_count == 2:
+                # Wait longer than debounce window before returning 2nd event
+                time.sleep(0.4)
+                return event2
+            else:
+                threading.Event().wait(0.01)
+                return MagicMock(type=999)
+
+        mock_display = MagicMock()
+        mock_display.screen.return_value.root = MagicMock()
+        mock_display.keysym_to_keycode.return_value = 47
+        mock_display.next_event.side_effect = next_event
+
+        def run():
+            with patch(
+                "transcribe.hotkey.xdisplay.Display", return_value=mock_display
+            ):
+                listener._run()
+
+        listener._running = True
+        t = threading.Thread(target=run)
+        t.start()
+        time.sleep(0.6)
+        listener._running = False
+        t.join(timeout=1)
+
+        # Both keypresses should fire (separated by > debounce window)
+        assert callback.call_count == 2
