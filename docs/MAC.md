@@ -28,13 +28,19 @@ uv sync --extra macos
 
 The first run will download the Whisper model (~1.4 GB for the default model) from Hugging Face. Subsequent runs use the cached model.
 
-### Accessibility permissions
+### Accessibility permissions (required)
 
-The global hotkey listener and paste simulation require accessibility permissions. Go to:
+> **Important:** Without accessibility permissions, the global hotkey will not work and transcribe will be unable to paste text into other applications. This step is mandatory.
+
+macOS requires explicit permission for apps to listen for global keyboard events and simulate keystrokes. Go to:
 
 **System Settings → Privacy & Security → Accessibility**
 
-Add your terminal app (Terminal.app, iTerm2, Warp, etc.) to the list.
+Add the app that runs transcribe to the allowed list:
+- If running from a terminal: add your terminal app (Terminal.app, iTerm2, Warp, etc.)
+- If running as a launchd service: add the `transcribe` binary itself (navigate to the `.venv/bin/transcribe` path inside the project)
+
+You may need to restart the app after granting permissions.
 
 ### launchd service (auto-start on login)
 
