@@ -1,23 +1,44 @@
 import subprocess
 import time
 
+from transcribe.clipboard_content import ClipboardContent, pick_best_target
+
 
 class Clipboard:
-    def _get_clipboard(self) -> str | None:
+    def _get_clipboard(self) -> ClipboardContent | None:
         result = subprocess.run(
-            ["xclip", "-selection", "clipboard", "-o"],
+            ["xclip", "-selection", "clipboard", "-o", "-t", "TARGETS"],
             capture_output=True,
-            text=True,
+            text=False,
         )
-        if result.returncode == 0:
-            return result.stdout
-        return None
+        if result.returncode != 0:
+            return None
+        targets = result.stdout.decode(errors="replace").splitlines()
+        mime = pick_best_target(targets)
+        if mime is None:
+            return None
+        result = subprocess.run(
+            ["xclip", "-selection", "clipboard", "-o", "-t", mime],
+            capture_output=True,
+            text=False,
+        )
+        if result.returncode != 0:
+            return None
+        return ClipboardContent(data=result.stdout, mime_type=mime)
 
     def _set_clipboard(self, text: str):
         subprocess.run(
             ["xclip", "-selection", "clipboard"],
             input=text,
             text=True,
+            check=True,
+        )
+
+    def _restore_clipboard(self, content: ClipboardContent):
+        subprocess.run(
+            ["xclip", "-selection", "clipboard", "-t", content.mime_type],
+            input=content.data,
+            text=False,
             check=True,
         )
 
@@ -35,6 +56,6 @@ class Clipboard:
             check=True,
         )
         # Restore the previous clipboard contents.
-        time.sleep(0.05)
+        time.sleep(0.2)
         if previous is not None:
-            self._set_clipboard(previous)
+            self._restore_clipboard(previous)
