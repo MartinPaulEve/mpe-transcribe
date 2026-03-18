@@ -14,6 +14,12 @@ from transcribe.recorder import AudioRecorder
 
 logger = logging.getLogger(__name__)
 
+_PORTAUDIO_HINT = (
+    "Check microphone permissions (macOS: System Settings → "
+    "Privacy & Security → Microphone) and ensure no other app "
+    "is using the mic."
+)
+
 
 class AppState(Enum):
     IDLE = "idle"
@@ -34,6 +40,7 @@ class TranscribeApp:
         self._notifier = create_notifier()
         self._clipboard = create_clipboard()
         self._lock = threading.Lock()
+        self._stop_event = threading.Event()
 
     @property
     def state(self) -> AppState:
@@ -42,7 +49,17 @@ class TranscribeApp:
     def toggle(self):
         with self._lock:
             if self._state == AppState.IDLE:
-                self._start_recording()
+                try:
+                    self._start_recording()
+                except Exception:
+                    logger.exception(
+                        "Failed to start recording. %s",
+                        _PORTAUDIO_HINT,
+                    )
+                    self._notifier.notify(
+                        "Transcribe", "Mic error — see logs"
+                    )
+                    self._state = AppState.IDLE
             elif self._state == AppState.RECORDING:
                 self._stop_and_transcribe()
 
@@ -96,13 +113,23 @@ class TranscribeApp:
             self._config["hotkey"],
         )
         self._hotkey.start()
-        try:
-            signal.pause()
-        except KeyboardInterrupt:
-            pass
+
+        def _handle_signal(signum, frame):
+            self._stop_event.set()
+
+        signal.signal(signal.SIGINT, _handle_signal)
+        signal.signal(signal.SIGTERM, _handle_signal)
+        self._stop_event.wait()
         self.shutdown()
 
     def shutdown(self):
+        with self._lock:
+            if self._state == AppState.RECORDING:
+                try:
+                    self._recorder.stop()
+                except Exception:
+                    pass
+                self._state = AppState.IDLE
         self._hotkey.stop()
         logger.info("Shutdown complete")
 

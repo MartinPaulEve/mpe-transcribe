@@ -1,7 +1,10 @@
+import logging
 import threading
 
 import numpy as np
 import sounddevice as sd
+
+logger = logging.getLogger(__name__)
 
 
 class AudioRecorder:
@@ -17,6 +20,8 @@ class AudioRecorder:
         return self._recording
 
     def _callback(self, indata, frames, time_info, status):
+        if status:
+            logger.warning("PortAudio status: %s", status)
         self._frames.append(indata.copy())
 
     def start(self):

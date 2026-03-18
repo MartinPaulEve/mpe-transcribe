@@ -124,12 +124,23 @@ class TestApp:
             "Transcribe", "Recording too short"
         )
 
+    def test_recording_error_returns_to_idle(self):
+        app, mock_rec, _, _, mock_notif, _ = self._make_app()
+        mock_rec.start.side_effect = RuntimeError("PortAudio error")
+
+        app.toggle()
+
+        assert app.state == AppState.IDLE
+        mock_notif.notify.assert_called_once_with(
+            "Transcribe", "Mic error — see logs"
+        )
+
     def test_run_notifies_when_ready(self):
         app, _, mock_trans, mock_hk, mock_notif, _ = self._make_app()
 
-        # Make signal.pause raise immediately so run() returns
-        with patch("transcribe.app.signal") as mock_signal:
-            mock_signal.pause.side_effect = KeyboardInterrupt
+        # Set stop event immediately so run() returns
+        app._stop_event.set()
+        with patch("transcribe.app.signal"):
             app.run()
 
         mock_trans.load_model.assert_called_once()
@@ -140,4 +151,13 @@ class TestApp:
     def test_shutdown_stops_hotkey(self):
         app, _, _, mock_hk, _, _ = self._make_app()
         app.shutdown()
+        mock_hk.stop.assert_called_once()
+
+    def test_shutdown_stops_active_recording(self):
+        app, mock_rec, _, mock_hk, _, _ = self._make_app()
+        mock_rec.stop.return_value = np.array([], dtype=np.float32)
+        app._state = AppState.RECORDING
+        app.shutdown()
+        mock_rec.stop.assert_called_once()
+        assert app.state == AppState.IDLE
         mock_hk.stop.assert_called_once()
