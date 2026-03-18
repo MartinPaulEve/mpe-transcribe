@@ -4,10 +4,13 @@ import threading
 from enum import Enum
 
 from transcribe.config import load_config, parse_hotkey
-from transcribe.factory import create_clipboard, create_hotkey_listener
-from transcribe.notifier import AppNotifier
+from transcribe.factory import (
+    create_clipboard,
+    create_hotkey_listener,
+    create_notifier,
+    create_transcriber,
+)
 from transcribe.recorder import AudioRecorder
-from transcribe.transcriber import Transcriber
 
 logger = logging.getLogger(__name__)
 
@@ -23,12 +26,12 @@ class TranscribeApp:
         self._config = config or load_config()
         self._state = AppState.IDLE
         self._recorder = AudioRecorder()
-        self._transcriber = Transcriber(model_name=self._config["model"])
+        self._transcriber = create_transcriber(self._config["model"])
         modifiers, key = parse_hotkey(self._config["hotkey"])
         self._hotkey = create_hotkey_listener(
             self.toggle, modifiers=modifiers, key=key
         )
-        self._notifier = AppNotifier()
+        self._notifier = create_notifier()
         self._clipboard = create_clipboard()
         self._lock = threading.Lock()
 

@@ -15,14 +15,22 @@ class TestApp:
     def _make_app(self):
         mock_hk = MagicMock()
         mock_cb = MagicMock()
+        mock_trans = MagicMock()
+        mock_notif = MagicMock()
         with (
             patch("transcribe.app.AudioRecorder") as mock_rec_cls,
-            patch("transcribe.app.Transcriber") as mock_trans_cls,
+            patch(
+                "transcribe.app.create_transcriber",
+                return_value=mock_trans,
+            ),
             patch(
                 "transcribe.app.create_hotkey_listener",
                 return_value=mock_hk,
             ),
-            patch("transcribe.app.AppNotifier") as mock_notif_cls,
+            patch(
+                "transcribe.app.create_notifier",
+                return_value=mock_notif,
+            ),
             patch(
                 "transcribe.app.create_clipboard",
                 return_value=mock_cb,
@@ -32,9 +40,9 @@ class TestApp:
             return (
                 app,
                 mock_rec_cls.return_value,
-                mock_trans_cls.return_value,
+                mock_trans,
                 mock_hk,
-                mock_notif_cls.return_value,
+                mock_notif,
                 mock_cb,
             )
 

@@ -35,3 +35,18 @@ class TestDetectSession:
     )
     def test_no_env_vars_defaults_to_x11(self):
         assert detect_session() == "x11"
+
+    @patch("transcribe.session.platform.system", return_value="Darwin")
+    def test_macos_detected_on_darwin(self, mock_system):
+        assert detect_session() == "macos"
+
+    @patch("transcribe.session.platform.system", return_value="Linux")
+    @patch.dict("os.environ", {"XDG_SESSION_TYPE": "x11"}, clear=False)
+    def test_linux_not_detected_as_macos(self, mock_system):
+        assert detect_session() == "x11"
+
+    @patch("transcribe.session.platform.system", return_value="Darwin")
+    @patch.dict("os.environ", {"XDG_SESSION_TYPE": "x11"}, clear=False)
+    def test_macos_takes_priority_over_x11(self, mock_system):
+        """macOS detection should take priority over XDG env vars."""
+        assert detect_session() == "macos"
