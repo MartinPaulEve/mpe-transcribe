@@ -11,6 +11,7 @@ from transcribe.factory import (
     create_transcriber,
 )
 from transcribe.recorder import AudioRecorder
+from transcribe.session import detect_session
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +106,13 @@ class TranscribeApp:
         logging.basicConfig(level=logging.INFO)
         logger.info("Model: %s", self._config["model"])
         logger.info("Hotkey: %s", self._config["hotkey"])
+        if detect_session() == "macos":
+            from transcribe.macos_permissions import (
+                warn_if_not_trusted,
+            )
+
+            warn_if_not_trusted()
+
         logger.info("Loading model...")
         self._transcriber.load_model()
         self._notifier.notify_and_ding("Transcribe", "Ready")
