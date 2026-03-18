@@ -1,3 +1,9 @@
+## 1.3.1 (2026-03-18)
+
+### Fix
+
+- **clipboard**: preserve non-text content and increase restore delay
+
 ## 1.3.0 (2026-03-15)
 
 ### Feat
