@@ -10,11 +10,10 @@ logger = logging.getLogger(__name__)
 
 _ACCESSIBILITY_REMEDIATION = (
     "Open System Settings → Privacy & Security → Accessibility "
-    "and add this app to the allowed list.\n\n"
+    "and add the Python binary to the allowed list.\n\n"
+    "Find the binary with:  python -c \"import sys; print(sys.executable)\"\n\n"
     "If running from a terminal, add your terminal app "
-    "(Terminal.app, iTerm2, etc.).\n\n"
-    "If running as a service, add the transcribe binary "
-    "(.venv/bin/transcribe inside the project folder).\n\n"
+    "(Terminal.app, iTerm2, etc.) instead.\n\n"
     "You may need to restart after granting permissions."
 )
 
@@ -23,9 +22,9 @@ _MICROPHONE_REMEDIATION = (
     "service. Run 'uv run transcribe' once from the terminal — "
     "macOS will show a permission prompt. Grant access, then "
     "Ctrl+C and start the service.\n\n"
-    "If you previously denied the prompt, go to "
-    "System Settings → Privacy & Security → Microphone "
-    "and toggle access on for your terminal app."
+    "If you previously denied the prompt, reset with:\n"
+    "  tccutil reset Microphone\n"
+    "Then run 'uv run transcribe' again."
 )
 
 
@@ -42,6 +41,86 @@ def is_accessibility_trusted() -> bool:
     except (OSError, AttributeError):
         logger.debug("Could not call AXIsProcessTrusted", exc_info=True)
         return True  # can't determine — assume OK
+
+
+def request_accessibility() -> bool:
+    """Check accessibility and prompt the user if not trusted.
+
+    Uses AXIsProcessTrustedWithOptions with kAXTrustedCheckOptionPrompt
+    to show a macOS system dialog that guides the user to the correct
+    System Settings pane. Returns True if already trusted.
+    """
+    try:
+        lib_path = ctypes.util.find_library("ApplicationServices")
+        if lib_path is None:
+            return True
+
+        lib = ctypes.cdll.LoadLibrary(lib_path)
+
+        objc_path = ctypes.util.find_library("objc")
+        if objc_path is None:
+            return is_accessibility_trusted()
+        objc = ctypes.cdll.LoadLibrary(objc_path)
+
+        cf_path = ctypes.util.find_library("CoreFoundation")
+        if cf_path is None:
+            return is_accessibility_trusted()
+        cf = ctypes.cdll.LoadLibrary(cf_path)
+
+        # Set up objc runtime calls
+        objc.objc_getClass.restype = ctypes.c_void_p
+        objc.objc_getClass.argtypes = [ctypes.c_char_p]
+        objc.sel_registerName.restype = ctypes.c_void_p
+        objc.sel_registerName.argtypes = [ctypes.c_char_p]
+
+        # Build options dict: {kAXTrustedCheckOptionPrompt: True}
+        # kAXTrustedCheckOptionPrompt is a CFString constant
+        prompt_key = ctypes.c_void_p.in_dll(
+            lib, "kAXTrustedCheckOptionPrompt"
+        )
+
+        cf.CFBooleanGetValue.restype = ctypes.c_bool
+        cf_true = ctypes.c_void_p.in_dll(cf, "kCFBooleanTrue")
+
+        # Create a CFDictionary with one entry
+        cf.CFDictionaryCreate.restype = ctypes.c_void_p
+        cf.CFDictionaryCreate.argtypes = [
+            ctypes.c_void_p,  # allocator
+            ctypes.POINTER(ctypes.c_void_p),  # keys
+            ctypes.POINTER(ctypes.c_void_p),  # values
+            ctypes.c_long,  # count
+            ctypes.c_void_p,  # key callbacks
+            ctypes.c_void_p,  # value callbacks
+        ]
+
+        keys = (ctypes.c_void_p * 1)(prompt_key)
+        values = (ctypes.c_void_p * 1)(cf_true)
+
+        options = cf.CFDictionaryCreate(
+            None, keys, values, 1, None, None
+        )
+
+        lib.AXIsProcessTrustedWithOptions.restype = ctypes.c_bool
+        lib.AXIsProcessTrustedWithOptions.argtypes = [ctypes.c_void_p]
+
+        trusted = lib.AXIsProcessTrustedWithOptions(options)
+
+        cf.CFRelease.argtypes = [ctypes.c_void_p]
+        cf.CFRelease(options)
+
+        if trusted:
+            logger.info("Accessibility: already trusted.")
+        else:
+            logger.info(
+                "Accessibility: not trusted — macOS prompt shown."
+            )
+        return trusted
+    except (OSError, AttributeError, ValueError):
+        logger.debug(
+            "Could not call AXIsProcessTrustedWithOptions",
+            exc_info=True,
+        )
+        return is_accessibility_trusted()
 
 
 def get_microphone_status() -> str:
@@ -216,7 +295,7 @@ def warn_if_not_trusted():
     interactively, triggers the macOS permission prompt so the user
     can grant access right away.
     """
-    if not is_accessibility_trusted():
+    if not request_accessibility():
         _warn_missing_permission(
             "Accessibility",
             _ACCESSIBILITY_REMEDIATION,

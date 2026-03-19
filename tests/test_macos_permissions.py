@@ -7,6 +7,7 @@ from transcribe.macos_permissions import (
     _warn_missing_permission,
     get_microphone_status,
     is_accessibility_trusted,
+    request_accessibility,
     request_microphone_access,
     warn_if_not_trusted,
 )
@@ -49,6 +50,57 @@ class TestIsAccessibilityTrusted:
             mock_ctypes.util.find_library.return_value = "/fake/path"
             mock_ctypes.cdll.LoadLibrary.side_effect = OSError("fail")
             assert is_accessibility_trusted() is True
+
+
+class TestRequestAccessibility:
+    def test_returns_true_when_library_not_found(self):
+        with patch(
+            "transcribe.macos_permissions.ctypes"
+        ) as mock_ctypes:
+            mock_ctypes.util.find_library.return_value = None
+            assert request_accessibility() is True
+
+    def test_falls_back_to_is_trusted_on_error(self):
+        with (
+            patch(
+                "transcribe.macos_permissions.ctypes"
+            ) as mock_ctypes,
+            patch(
+                "transcribe.macos_permissions.is_accessibility_trusted",
+                return_value=True,
+            ) as mock_trusted,
+        ):
+            mock_ctypes.util.find_library.return_value = "/fake/path"
+            mock_ctypes.cdll.LoadLibrary.side_effect = OSError("fail")
+            assert request_accessibility() is True
+            mock_trusted.assert_called_once()
+
+    def test_returns_false_when_not_trusted(self):
+        mock_lib = MagicMock()
+        mock_lib.AXIsProcessTrustedWithOptions.return_value = False
+        mock_cf = MagicMock()
+        mock_cf.CFDictionaryCreate.return_value = MagicMock()
+
+        def fake_find_library(name):
+            return f"/fake/{name}"
+
+        def fake_load_library(path):
+            if "CoreFoundation" in path:
+                return mock_cf
+            return mock_lib
+
+        with patch(
+            "transcribe.macos_permissions.ctypes"
+        ) as mock_ctypes:
+            mock_ctypes.util.find_library = fake_find_library
+            mock_ctypes.cdll.LoadLibrary = fake_load_library
+            mock_ctypes.c_void_p = MagicMock()
+            mock_ctypes.c_bool = bool
+            mock_ctypes.c_long = int
+            mock_ctypes.c_char_p = bytes
+            mock_ctypes.POINTER = MagicMock()
+            mock_ctypes.CFUNCTYPE = MagicMock()
+            assert request_accessibility() is False
 
 
 class TestGetMicrophoneStatus:
@@ -194,7 +246,7 @@ class TestWarnIfNotTrusted:
     def test_no_warnings_when_all_granted(self):
         with (
             patch(
-                "transcribe.macos_permissions.is_accessibility_trusted",
+                "transcribe.macos_permissions.request_accessibility",
                 return_value=True,
             ),
             patch(
@@ -211,7 +263,7 @@ class TestWarnIfNotTrusted:
     def test_warns_when_accessibility_missing(self):
         with (
             patch(
-                "transcribe.macos_permissions.is_accessibility_trusted",
+                "transcribe.macos_permissions.request_accessibility",
                 return_value=False,
             ),
             patch(
@@ -229,7 +281,7 @@ class TestWarnIfNotTrusted:
     def test_warns_when_microphone_denied(self):
         with (
             patch(
-                "transcribe.macos_permissions.is_accessibility_trusted",
+                "transcribe.macos_permissions.request_accessibility",
                 return_value=True,
             ),
             patch(
@@ -247,7 +299,7 @@ class TestWarnIfNotTrusted:
     def test_requests_mic_when_not_determined_and_interactive(self):
         with (
             patch(
-                "transcribe.macos_permissions.is_accessibility_trusted",
+                "transcribe.macos_permissions.request_accessibility",
                 return_value=True,
             ),
             patch(
@@ -273,7 +325,7 @@ class TestWarnIfNotTrusted:
     def test_warns_when_mic_request_denied_interactively(self):
         with (
             patch(
-                "transcribe.macos_permissions.is_accessibility_trusted",
+                "transcribe.macos_permissions.request_accessibility",
                 return_value=True,
             ),
             patch(
@@ -299,7 +351,7 @@ class TestWarnIfNotTrusted:
     def test_warns_when_not_determined_and_not_interactive(self):
         with (
             patch(
-                "transcribe.macos_permissions.is_accessibility_trusted",
+                "transcribe.macos_permissions.request_accessibility",
                 return_value=True,
             ),
             patch(
@@ -321,7 +373,7 @@ class TestWarnIfNotTrusted:
     def test_skips_mic_check_when_unknown(self):
         with (
             patch(
-                "transcribe.macos_permissions.is_accessibility_trusted",
+                "transcribe.macos_permissions.request_accessibility",
                 return_value=True,
             ),
             patch(

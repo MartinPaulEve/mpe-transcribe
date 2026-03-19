@@ -36,19 +36,20 @@ macOS requires two permissions for transcribe to work. The app checks both at st
 
 > **Important:** Without accessibility permissions, the global hotkey will not work and transcribe will be unable to paste text into other applications.
 
-**System Settings → Privacy & Security → Accessibility**
-
-Add the app that runs transcribe to the allowed list:
-- If running from a terminal: add your terminal app (Terminal.app, iTerm2, Warp, etc.)
-- If running as a launchd service: add the `transcribe` binary itself (navigate to the `.venv/bin/transcribe` path inside the project)
+The install script and the app itself will show a macOS prompt guiding you to the Accessibility settings pane. Grant access to:
+- If running from a terminal: your terminal app (Terminal.app, iTerm2, Warp, etc.)
+- If running as a launchd service: the **Python binary**. Find its path with:
+  ```bash
+  .venv/bin/python -c "import sys; print(sys.executable)"
+  ```
 
 You may need to restart the app after granting permissions.
 
 #### Microphone
 
-> **Important:** Without microphone permissions, the app will record silence and transcription will fail. macOS only shows the permission prompt when running interactively (not from a launchd service).
+> **Important:** Without microphone permissions, the app will record silence and transcription will fail.
 
-The install script (`./scripts/install_macos.sh`) handles this automatically — it codesigns the binaries (so macOS can track them in System Settings) and triggers the microphone permission prompt. Click **Allow** when the dialog appears.
+The install script handles this automatically — it codesigns the Python binary (so macOS can track it in System Settings) and triggers the microphone permission prompt. Click **Allow** when the dialog appears.
 
 If running manually without the install script, run `uv run transcribe` once from the terminal. macOS will show the permission dialog on first use.
 
@@ -59,7 +60,7 @@ tccutil reset Microphone
 
 ### launchd service (auto-start on login)
 
-An install script sets up a launchd user agent that auto-starts transcribe when you log in. It also codesigns the binaries and requests microphone permission:
+The install script sets up a launchd user agent that auto-starts transcribe when you log in. It codesigns the Python binary, requests microphone permission, and triggers the accessibility prompt:
 
 ```bash
 ./scripts/install_macos.sh

@@ -18,19 +18,19 @@ fi
 
 PYTHON="$SCRIPT_DIR/.venv/bin/python"
 
-# Ad-hoc codesign the Python and transcribe binaries so that macOS
-# TCC can track their permissions. Without a code signature, macOS
-# cannot persist microphone/accessibility grants for CLI tools and
-# they won't appear in System Settings.
-echo "==> Codesigning binaries for macOS permissions..."
-codesign -s - -f "$PYTHON" 2>/dev/null || true
-codesign -s - -f "$TRANSCRIBE_BIN" 2>/dev/null || true
-# Also sign the actual python3 binary (transcribe is a wrapper script)
-PYTHON3_BIN="$(readlink -f "$PYTHON" 2>/dev/null || echo "$PYTHON")"
-if [ "$PYTHON3_BIN" != "$PYTHON" ] && [ -f "$PYTHON3_BIN" ]; then
-    codesign -s - -f "$PYTHON3_BIN" 2>/dev/null || true
-fi
-echo "    Done."
+# Resolve the real Python binary (follow symlinks).
+# macOS readlink doesn't support -f, so use Python itself.
+PYTHON_REAL=$("$PYTHON" -c "import sys; print(sys.executable)" 2>/dev/null || echo "$PYTHON")
+
+# Ad-hoc codesign the Python binary so that macOS TCC can track
+# its permissions. Without a code signature, macOS cannot persist
+# microphone/accessibility grants and the binary won't appear in
+# System Settings.
+# NOTE: Only sign the real Python binary — the "transcribe" entry
+# point is a text wrapper script (shebang), not a binary.
+echo "==> Codesigning Python binary for macOS permissions..."
+codesign -s - -f "$PYTHON_REAL" 2>/dev/null || true
+echo "    Signed: $PYTHON_REAL"
 
 # Request microphone permission now (while running interactively).
 # The launchd service has no UI to show the macOS permission prompt,
@@ -56,6 +56,14 @@ elif [ "$MIC_STATUS" = "denied" ] || [ "$MIC_STATUS" = "restricted" ]; then
     echo ""
 fi
 
+# Trigger accessibility prompt — macOS will show a dialog guiding
+# the user to System Settings → Accessibility.
+echo "==> Checking accessibility permissions..."
+"$PYTHON" -c "
+from transcribe.macos_permissions import request_accessibility
+request_accessibility()
+" 2>/dev/null
+
 mkdir -p "$PLIST_DIR"
 
 cat > "$PLIST_PATH" <<PLIST
@@ -68,7 +76,9 @@ cat > "$PLIST_PATH" <<PLIST
     <string>$PLIST_NAME</string>
     <key>ProgramArguments</key>
     <array>
-        <string>$TRANSCRIBE_BIN</string>
+        <string>$PYTHON_REAL</string>
+        <string>-m</string>
+        <string>transcribe</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
@@ -87,9 +97,15 @@ launchctl load "$PLIST_PATH" 2>/dev/null || true
 echo "Installed launchd agent: $PLIST_PATH"
 echo "The service will start automatically on login."
 echo ""
-echo "IMPORTANT: Grant accessibility permissions"
+echo "IMPORTANT: Grant permissions for the Python binary:"
+echo "  $PYTHON_REAL"
+echo ""
 echo "  System Settings → Privacy & Security → Accessibility"
-echo "  Add your terminal app (Terminal.app, iTerm2, etc.)"
+echo "    Add the Python binary above (drag it in, or use + to browse)"
+echo ""
+echo "  System Settings → Privacy & Security → Microphone"
+echo "    The Python binary should appear after granting mic access above."
+echo "    If not, run: uv run transcribe  (from the terminal, then Ctrl+C)"
 echo ""
 echo "To start now:  launchctl start $PLIST_NAME"
 echo "To stop:       launchctl stop $PLIST_NAME"
