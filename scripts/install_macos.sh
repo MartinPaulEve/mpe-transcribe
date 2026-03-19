@@ -102,17 +102,11 @@ cc -O2 -o "$APP_DIR/Contents/MacOS/transcribe-launcher" \
 
 echo "    Compiled: $APP_DIR/Contents/MacOS/transcribe-launcher"
 
-# Ad-hoc codesign the .app bundle so macOS accepts it.
-# NOTE: We do NOT codesign the Python binary — that would
-# invalidate any existing TCC grants the user has set up.
-echo "==> Codesigning $APP_NAME.app..."
-codesign -s - -f --deep "$APP_DIR" 2>/dev/null || true
-
-echo "    Installed: $APP_DIR"
-
 # ── Generate .icns icon ──────────────────────────────────────────
 # Converts the SVG icon to .icns so the app has a proper icon in
 # macOS permission dialogs (Privacy & Security → Microphone, etc.)
+# This MUST happen before codesigning — adding files after signing
+# invalidates the signature and breaks TCC trust.
 ICON_SVG="$SCRIPT_DIR/assets/transcribe.svg"
 ICON_ICNS="$APP_DIR/Contents/Resources/Transcribe.icns"
 
@@ -143,6 +137,14 @@ if [ -f "$ICON_SVG" ]; then
 
     rm -rf "$ICON_TMP"
 fi
+
+# Ad-hoc codesign the .app bundle so macOS accepts it.
+# NOTE: We do NOT codesign the Python binary — that would
+# invalidate any existing TCC grants the user has set up.
+echo "==> Codesigning $APP_NAME.app..."
+codesign -s - -f --deep "$APP_DIR" 2>/dev/null || true
+
+echo "    Installed: $APP_DIR"
 
 # ── Request permissions interactively ─────────────────────────────
 # Microphone permission is requested at runtime when the user first

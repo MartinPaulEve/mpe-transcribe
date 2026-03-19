@@ -19,9 +19,9 @@ _MICROPHONE_REMEDIATION = (
     "Microphone access must be granted before running as a "
     "service. Go to System Settings → Privacy & Security → "
     "Microphone and toggle on 'Transcribe'.\n\n"
-    "If it doesn't appear, run the install script again:\n"
-    "  ./scripts/install_macos.sh\n"
-    "It will prompt for microphone access interactively."
+    "If 'Transcribe' doesn't appear there yet, run the app "
+    "from a terminal first (transcribe) and press the hotkey — "
+    "macOS will show the microphone permission prompt."
 )
 
 
