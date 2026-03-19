@@ -104,15 +104,16 @@ print(f'0x{kc:02x} 0x{mf:06x}')
 echo "    Hotkey keycode=$HOTKEY_KEYCODE modifiers=$HOTKEY_MODIFIERS"
 
 # Compile the native Mach-O launcher.
-# The launcher monitors the global hotkey via CGEventTap (which gets
-# accessibility from the .app's TCC grant) and signals the Python
-# child with SIGUSR1 when the hotkey is pressed.
+# The launcher registers a global hotkey via RegisterEventHotKey (Carbon)
+# which consumes the keystroke, and falls back to a listen-only CGEventTap
+# if Carbon registration fails.
 echo "==> Compiling native launcher..."
 cc -O2 -o "$APP_DIR/Contents/MacOS/transcribe-launcher" \
     -DPYTHON_BIN="$PYTHON_REAL" \
     -DPYTHON_PATH="$SCRIPT_DIR/src" \
     -DHOTKEY_KEYCODE="$HOTKEY_KEYCODE" \
     -DHOTKEY_MODIFIERS="$HOTKEY_MODIFIERS" \
+    -framework Carbon \
     -framework CoreFoundation \
     -framework CoreGraphics \
     -lobjc \
