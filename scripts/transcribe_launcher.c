@@ -283,17 +283,20 @@ static bool setup_eventtap_fallback(void) {
 
 /* ── Signal handlers ────────────────────────────────────────────── */
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+
 static void forward_signal(int sig) {
     if (child_pid > 0)
         kill(child_pid, sig);
-    if (main_loop)
-        CFRunLoopStop(main_loop);
+    QuitApplicationEventLoop();
 }
 
 static void on_sigchld(int sig) {
-    if (main_loop)
-        CFRunLoopStop(main_loop);
+    QuitApplicationEventLoop();
 }
+
+#pragma clang diagnostic pop
 
 /* ── Main ───────────────────────────────────────────────────────── */
 
@@ -357,10 +360,15 @@ int main(int argc, char *argv[]) {
             "launchctl start com.mpe.transcribe\n");
     }
 
-    /* Run the event loop — dispatches both Carbon hotkey events
-     * and CGEventTap callbacks. */
+    /* RunApplicationEventLoop dispatches Carbon hotkey events
+     * (which CFRunLoopRun alone does NOT).  It also dispatches
+     * CGEventTap callbacks since both use the main run loop. */
     main_loop = CFRunLoopGetCurrent();
-    CFRunLoopRun();
+
+    #pragma clang diagnostic push
+    #pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    RunApplicationEventLoop();
+    #pragma clang diagnostic pop
 
     /* Cleanup. */
     if (event_tap) {
