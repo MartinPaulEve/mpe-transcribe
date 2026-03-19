@@ -1,7 +1,4 @@
-import os
-import tempfile
-
-import soundfile as sf
+import numpy as np
 
 DEFAULT_MODEL = "mlx-community/whisper-large-v3-turbo"
 
@@ -21,16 +18,11 @@ class MacOSTranscriber:
             raise RuntimeError("model not loaded")
         import mlx_whisper
 
-        with tempfile.NamedTemporaryFile(
-            suffix=".wav", delete=False
-        ) as f:
-            tmp_path = f.name
-            sf.write(f, audio, sample_rate)
-        try:
-            result = mlx_whisper.transcribe(
-                tmp_path,
-                path_or_hf_repo=self._model_name,
-            )
-            return result.get("text", "").strip()
-        finally:
-            os.unlink(tmp_path)
+        # mlx_whisper accepts a numpy float32 array directly,
+        # bypassing ffmpeg file decoding entirely.
+        audio = np.asarray(audio, dtype=np.float32).flatten()
+        result = mlx_whisper.transcribe(
+            audio,
+            path_or_hf_repo=self._model_name,
+        )
+        return result.get("text", "").strip()
