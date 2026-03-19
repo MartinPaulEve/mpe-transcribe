@@ -120,6 +120,10 @@ IDLE ──[hotkey]──> RECORDING ──[hotkey]──> TRANSCRIBING ──[d
 | `wayland_clipboard.py` | Wayland: clipboard via wl-clipboard + ydotool (experimental) |
 | `macos_clipboard.py` | macOS: clipboard via pbcopy/pbpaste + osascript |
 
+## Tested on
+
+- **macOS:** Mac M3 Pro (Apple Silicon), macOS 14.2.1 (Sonoma)
+
 ## Notes
 
 This application was coded with the aid of LLMs.
