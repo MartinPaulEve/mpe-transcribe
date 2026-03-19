@@ -70,3 +70,14 @@ _mock_ecodes.EV_KEY = 1
 _mock_evdev.ecodes = _mock_ecodes
 sys.modules["evdev"] = _mock_evdev
 sys.modules["evdev.ecodes"] = _mock_ecodes
+
+# Mock pynput modules for macOS hotkey tests
+_mock_pynput = MagicMock()
+_mock_pynput_keyboard = MagicMock()
+_mock_pynput.keyboard = _mock_pynput_keyboard
+sys.modules["pynput"] = _mock_pynput
+sys.modules["pynput.keyboard"] = _mock_pynput_keyboard
+
+# Mock mlx_whisper for macOS transcriber tests
+_mock_mlx_whisper = MagicMock()
+sys.modules["mlx_whisper"] = _mock_mlx_whisper
