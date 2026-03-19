@@ -87,7 +87,7 @@ The `.app` contains:
 - An `Info.plist` with bundle ID `com.mpe.transcribe`
 - `NSMicrophoneUsageDescription` for the mic permission dialog
 
-The launcher runs Python as a child process (not `exec`), keeping the native binary alive as the process that macOS associates with TCC grants. The launchd plist uses `open -W -a Transcribe.app` so macOS designates the app as the "responsible process" for TCC.
+The launcher runs Python as a child process (not `exec`), keeping the native binary alive as the process that macOS associates with TCC grants. The launchd plist runs the launcher binary directly, so `launchctl stop` sends SIGTERM to the launcher, which forwards it to Python for clean shutdown.
 
 ## Usage
 

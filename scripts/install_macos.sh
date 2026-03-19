@@ -149,8 +149,11 @@ else:
 " 2>/dev/null
 
 # ── Install the launchd agent ─────────────────────────────────────
-# The plist uses `open -W -a Transcribe.app` so that macOS
-# designates the .app as the "responsible process" for TCC.
+# The plist runs the native launcher binary directly (not via `open`).
+# TCC identity comes from the binary living inside a signed .app bundle
+# with an Info.plist — `open` is not required for that.
+# Running the binary directly means launchctl stop sends SIGTERM to the
+# launcher, which forwards it to the Python child for clean shutdown.
 echo "==> Installing launchd agent..."
 mkdir -p "$PLIST_DIR"
 
@@ -164,10 +167,7 @@ cat > "$PLIST_PATH" <<PLIST
     <string>$PLIST_NAME</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/bin/open</string>
-        <string>-W</string>
-        <string>-a</string>
-        <string>$APP_DIR</string>
+        <string>$APP_DIR/Contents/MacOS/transcribe-launcher</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
