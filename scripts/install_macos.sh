@@ -4,6 +4,11 @@
 # Creates a lightweight Transcribe.app wrapper bundle so that macOS TCC
 # can persistently track permissions (accessibility + microphone) via
 # a stable CFBundleIdentifier — no more re-prompting after reboot.
+#
+# The launchd plist uses `open -W -a Transcribe.app` so that macOS
+# designates the .app as the "responsible process" for TCC checks.
+# The launcher runs Python as a *child* process (not exec) so the
+# .app's process stays alive and retains its TCC identity.
 set -euo pipefail
 
 PLIST_NAME="com.mpe.transcribe"
@@ -36,13 +41,18 @@ PYTHON_REAL=$("$PYTHON" -c "import sys; print(sys.executable)" 2>/dev/null || ec
 launchctl stop "$PLIST_NAME" 2>/dev/null || true
 launchctl unload "$PLIST_PATH" 2>/dev/null || true
 
+# Kill any running instance of the app
+killall -9 "$APP_NAME" 2>/dev/null || true
+
 # ── Build the .app bundle ─────────────────────────────────────────
 echo "==> Building $APP_NAME.app..."
 rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR/Contents/MacOS"
 mkdir -p "$APP_DIR/Contents/Resources"
 
-# Info.plist — gives the app a stable bundle identity for TCC
+# Info.plist — gives the app a stable bundle identity for TCC.
+# NSMicrophoneUsageDescription is required for the mic permission
+# dialog.  LSBackgroundOnly keeps it out of the Dock.
 cat > "$APP_DIR/Contents/Info.plist" <<INFOPLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
@@ -59,6 +69,8 @@ cat > "$APP_DIR/Contents/Info.plist" <<INFOPLIST
     <string>transcribe-launcher</string>
     <key>CFBundleVersion</key>
     <string>1.0</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
     <key>LSBackgroundOnly</key>
     <true/>
     <key>LSUIElement</key>
@@ -69,16 +81,37 @@ cat > "$APP_DIR/Contents/Info.plist" <<INFOPLIST
 </plist>
 INFOPLIST
 
-# Launcher script — exec replaces the shell so the Python process
-# inherits the .app's bundle identity (and its TCC grants).
-cat > "$APP_DIR/Contents/MacOS/transcribe-launcher" <<LAUNCHER
+# Launcher script — runs Python as a CHILD process (not exec).
+# This keeps the .app's shell process alive as the "responsible
+# process" for macOS TCC, so accessibility and microphone grants
+# are attributed to Transcribe.app (not to the Python binary).
+# SIGTERM/SIGINT are forwarded to the child Python process.
+cat > "$APP_DIR/Contents/MacOS/transcribe-launcher" <<'LAUNCHER_HEAD'
 #!/bin/bash
+LAUNCHER_HEAD
+
+cat >> "$APP_DIR/Contents/MacOS/transcribe-launcher" <<LAUNCHER_BODY
 export PYTHONPATH="$SCRIPT_DIR/src:\${PYTHONPATH:-}"
-exec "$PYTHON_REAL" -m transcribe "\$@"
-LAUNCHER
+
+# Run Python as a child process — do NOT exec.
+"$PYTHON_REAL" -m transcribe "\$@" &
+CHILD=\$!
+
+# Forward termination signals to the child process.
+cleanup() {
+    kill -TERM "\$CHILD" 2>/dev/null
+    wait "\$CHILD" 2>/dev/null
+}
+trap cleanup TERM INT HUP
+
+# Wait for the child to exit.
+wait "\$CHILD"
+LAUNCHER_BODY
 chmod +x "$APP_DIR/Contents/MacOS/transcribe-launcher"
 
-# Ad-hoc codesign the .app so macOS accepts it
+# Ad-hoc codesign the .app bundle so macOS accepts it.
+# NOTE: We do NOT codesign the Python binary — that would
+# invalidate any existing TCC grants the user has set up.
 echo "==> Codesigning $APP_NAME.app..."
 codesign -s - -f --deep "$APP_DIR" 2>/dev/null || true
 
@@ -110,7 +143,7 @@ elif [ "$MIC_STATUS" = "denied" ] || [ "$MIC_STATUS" = "restricted" ]; then
     echo ""
 fi
 
-# Accessibility: prompt the user to grant it
+# Accessibility: prompt the user to grant it.
 echo "==> Checking accessibility permissions..."
 "$PYTHON" -c "
 from transcribe.macos_permissions import request_accessibility
@@ -125,6 +158,10 @@ else:
 " 2>/dev/null
 
 # ── Install the launchd agent ─────────────────────────────────────
+# The plist uses `open -W -a Transcribe.app` instead of running
+# the launcher directly. This makes macOS treat Transcribe.app as
+# the "responsible process" for TCC — permissions granted to the
+# app persist across reboots via the stable CFBundleIdentifier.
 echo "==> Installing launchd agent..."
 mkdir -p "$PLIST_DIR"
 
@@ -138,17 +175,15 @@ cat > "$PLIST_PATH" <<PLIST
     <string>$PLIST_NAME</string>
     <key>ProgramArguments</key>
     <array>
-        <string>$APP_DIR/Contents/MacOS/transcribe-launcher</string>
+        <string>/usr/bin/open</string>
+        <string>-W</string>
+        <string>-a</string>
+        <string>$APP_DIR</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
     <false/>
-    <key>EnvironmentVariables</key>
-    <dict>
-        <key>PATH</key>
-        <string>/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
-    </dict>
     <key>StandardOutPath</key>
     <string>/tmp/transcribe.stdout.log</string>
     <key>StandardErrorPath</key>
