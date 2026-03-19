@@ -124,6 +124,21 @@ class TestApp:
             "Transcribe", "Recording too short"
         )
 
+    def test_silent_audio_returns_to_idle(self):
+        app, mock_rec, mock_trans, _, mock_notif, _ = self._make_app()
+        # All zeros — simulates mic returning silence (no permission)
+        mock_rec.stop.return_value = np.zeros(16000, dtype=np.float32)
+
+        app.toggle()  # IDLE -> RECORDING
+        app.toggle()  # RECORDING -> IDLE (silent)
+
+        assert app.state == AppState.IDLE
+        mock_trans.transcribe.assert_not_called()
+        mock_notif.notify.assert_called_once_with(
+            "Transcribe",
+            "No audio detected — check mic permissions",
+        )
+
     def test_recording_error_returns_to_idle(self):
         app, mock_rec, _, _, mock_notif, _ = self._make_app()
         mock_rec.start.side_effect = RuntimeError("PortAudio error")

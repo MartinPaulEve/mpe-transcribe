@@ -3,6 +3,8 @@ import signal
 import threading
 from enum import Enum
 
+import numpy as np
+
 from transcribe.config import load_config, parse_hotkey
 from transcribe.factory import (
     create_clipboard,
@@ -20,6 +22,10 @@ _PORTAUDIO_HINT = (
     "Privacy & Security → Microphone) and ensure no other app "
     "is using the mic."
 )
+
+# RMS below this threshold is treated as silence (mic not working
+# or permissions denied — PortAudio returns zeros in that case).
+_SILENCE_RMS_THRESHOLD = 1e-4
 
 
 class AppState(Enum):
@@ -79,6 +85,20 @@ class TranscribeApp:
         )
         if len(audio) == 0:
             self._notifier.notify("Transcribe", "Recording too short")
+            self._state = AppState.IDLE
+            return
+        rms = float(np.sqrt(np.mean(audio**2)))
+        if rms < _SILENCE_RMS_THRESHOLD:
+            logger.warning(
+                "Recording is silent (RMS=%.2e). "
+                "Microphone may not be working or permissions "
+                "may be denied.",
+                rms,
+            )
+            self._notifier.notify(
+                "Transcribe",
+                "No audio detected — check mic permissions",
+            )
             self._state = AppState.IDLE
             return
         self._state = AppState.TRANSCRIBING

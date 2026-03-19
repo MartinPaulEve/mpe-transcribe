@@ -1,4 +1,4 @@
-"""Check macOS accessibility permissions and warn if missing."""
+"""Check macOS accessibility and microphone permissions."""
 
 import ctypes
 import ctypes.util
@@ -8,8 +8,18 @@ import sys
 
 logger = logging.getLogger(__name__)
 
-_REMEDIATION = (
+_ACCESSIBILITY_REMEDIATION = (
     "Open System Settings → Privacy & Security → Accessibility "
+    "and add this app to the allowed list.\n\n"
+    "If running from a terminal, add your terminal app "
+    "(Terminal.app, iTerm2, etc.).\n\n"
+    "If running as a service, add the transcribe binary "
+    "(.venv/bin/transcribe inside the project folder).\n\n"
+    "You may need to restart after granting permissions."
+)
+
+_MICROPHONE_REMEDIATION = (
+    "Open System Settings → Privacy & Security → Microphone "
     "and add this app to the allowed list.\n\n"
     "If running from a terminal, add your terminal app "
     "(Terminal.app, iTerm2, etc.).\n\n"
@@ -34,6 +44,39 @@ def is_accessibility_trusted() -> bool:
         return True  # can't determine — assume OK
 
 
+def is_microphone_authorized() -> bool:
+    """Return True if this process has microphone permissions.
+
+    Uses AVFoundation via a swift subprocess to check the
+    authorization status.  Returns 3 (authorized) on success.
+    """
+    try:
+        result = subprocess.run(
+            [
+                "swift",
+                "-e",
+                "import AVFoundation; "
+                "print(AVCaptureDevice.authorizationStatus("
+                "for: .audio).rawValue)",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        status = result.stdout.strip()
+        # 0=notDetermined, 1=restricted, 2=denied, 3=authorized
+        if status == "3":
+            return True
+        if status in ("1", "2"):
+            return False
+        # notDetermined (0) or unexpected — assume OK so macOS
+        # can show its own prompt on first use
+        return True
+    except Exception:
+        logger.debug("Could not check microphone status", exc_info=True)
+        return True  # can't determine — assume OK
+
+
 def _is_interactive() -> bool:
     """Return True if stdin is connected to a terminal."""
     try:
@@ -42,7 +85,7 @@ def _is_interactive() -> bool:
         return False
 
 
-def _show_alert_dialog(title: str, message: str):
+def _show_alert_dialog(title: str, message: str, settings_url: str):
     """Show a macOS modal alert dialog that blocks until dismissed."""
     script = (
         f'display alert "{title}" '
@@ -60,53 +103,76 @@ def _show_alert_dialog(title: str, message: str):
         )
         if "Open System Settings" in result.stdout:
             subprocess.run(
-                [
-                    "open",
-                    "x-apple.systempreferences:"
-                    "com.apple.preference.security"
-                    "?Privacy_Accessibility",
-                ],
+                ["open", settings_url],
                 check=False,
             )
     except Exception:
         logger.debug("Failed to show alert dialog", exc_info=True)
 
 
-def warn_if_not_trusted():
-    """Check accessibility permissions and warn the user if missing.
+_ACCESSIBILITY_SETTINGS_URL = (
+    "x-apple.systempreferences:"
+    "com.apple.preference.security"
+    "?Privacy_Accessibility"
+)
 
-    In a terminal session, logs a warning and sends a notification.
-    When running as a service (no tty), shows a modal alert dialog
-    that the user must dismiss.
-    """
-    if is_accessibility_trusted():
-        return
+_MICROPHONE_SETTINGS_URL = (
+    "x-apple.systempreferences:"
+    "com.apple.preference.security"
+    "?Privacy_Microphone"
+)
 
+
+def _warn_missing_permission(
+    name: str, remediation: str, settings_url: str
+):
+    """Warn about a missing permission via notification or dialog."""
     logger.warning(
-        "Accessibility permissions not granted. "
-        "The global hotkey will NOT work. %s",
-        _REMEDIATION,
+        "%s permissions not granted. %s",
+        name,
+        remediation,
     )
 
     if _is_interactive():
-        # Terminal: notification + stderr warning
         try:
             subprocess.run(
                 [
                     "osascript",
                     "-e",
-                    'display notification '
-                    '"Accessibility permissions required — '
-                    'hotkey will not work. Check terminal for details." '
-                    'with title "Transcribe"',
+                    f'display notification '
+                    f'"{name} permissions required — '
+                    f'check terminal for details." '
+                    f'with title "Transcribe"',
                 ],
                 check=False,
             )
         except Exception:
             pass
     else:
-        # Service mode: big modal dialog the user can't miss
         _show_alert_dialog(
-            "Transcribe — Accessibility Permission Required",
-            _REMEDIATION.replace("\n\n", " "),
+            f"Transcribe — {name} Permission Required",
+            remediation.replace("\n\n", " "),
+            settings_url,
+        )
+
+
+def warn_if_not_trusted():
+    """Check accessibility and microphone permissions on macOS.
+
+    In a terminal session, logs warnings and sends notifications.
+    When running as a service (no tty), shows modal alert dialogs
+    that the user must dismiss.
+    """
+    if not is_accessibility_trusted():
+        _warn_missing_permission(
+            "Accessibility",
+            _ACCESSIBILITY_REMEDIATION,
+            _ACCESSIBILITY_SETTINGS_URL,
+        )
+
+    if not is_microphone_authorized():
+        _warn_missing_permission(
+            "Microphone",
+            _MICROPHONE_REMEDIATION,
+            _MICROPHONE_SETTINGS_URL,
         )
