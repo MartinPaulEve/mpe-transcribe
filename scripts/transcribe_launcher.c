@@ -28,6 +28,16 @@
 #include <unistd.h>
 
 #include <Carbon/Carbon.h>
+
+/*
+ * RunApplicationEventLoop / QuitApplicationEventLoop were removed from
+ * recent SDK headers but remain in the HIToolbox dylib.  Declare them
+ * so the compiler doesn't reject the calls.
+ */
+extern void RunApplicationEventLoop(void)
+    __attribute__((weak_import));
+extern void QuitApplicationEventLoop(void)
+    __attribute__((weak_import));
 #include <CoreFoundation/CoreFoundation.h>
 #include <CoreGraphics/CoreGraphics.h>
 #include <objc/message.h>
@@ -283,20 +293,22 @@ static bool setup_eventtap_fallback(void) {
 
 /* ── Signal handlers ────────────────────────────────────────────── */
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+static void stop_event_loop(void) {
+    if (QuitApplicationEventLoop)
+        QuitApplicationEventLoop();
+    else if (main_loop)
+        CFRunLoopStop(main_loop);
+}
 
 static void forward_signal(int sig) {
     if (child_pid > 0)
         kill(child_pid, sig);
-    QuitApplicationEventLoop();
+    stop_event_loop();
 }
 
 static void on_sigchld(int sig) {
-    QuitApplicationEventLoop();
+    stop_event_loop();
 }
-
-#pragma clang diagnostic pop
 
 /* ── Main ───────────────────────────────────────────────────────── */
 
@@ -365,10 +377,10 @@ int main(int argc, char *argv[]) {
      * CGEventTap callbacks since both use the main run loop. */
     main_loop = CFRunLoopGetCurrent();
 
-    #pragma clang diagnostic push
-    #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-    RunApplicationEventLoop();
-    #pragma clang diagnostic pop
+    if (RunApplicationEventLoop)
+        RunApplicationEventLoop();
+    else
+        CFRunLoopRun();
 
     /* Cleanup. */
     if (event_tap) {
