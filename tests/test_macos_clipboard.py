@@ -37,9 +37,7 @@ class TestMacOSClipboard:
 
     def test_simulates_cmd_v_via_osascript(self):
         with patch("transcribe.macos_clipboard.subprocess") as mock_sub:
-            mock_sub.run.return_value = MagicMock(
-                returncode=0, stdout="old"
-            )
+            mock_sub.run.return_value = MagicMock(returncode=0, stdout="old")
             cb = MacOSClipboard()
             cb.paste_text("text")
             osascript_calls = [
@@ -62,20 +60,14 @@ class TestMacOSClipboard:
             cb.paste_text("new text")
             calls = mock_sub.run.call_args_list
             # Last call should be restoring the clipboard via pbcopy
-            last_pbcopy = [
-                c
-                for c in calls
-                if c[0][0][0] == "pbcopy"
-            ]
+            last_pbcopy = [c for c in calls if c[0][0][0] == "pbcopy"]
             # Should have 2 pbcopy calls: set new text, restore old text
             assert len(last_pbcopy) == 2
 
     def test_empty_clipboard_skips_restore(self):
         with patch("transcribe.macos_clipboard.subprocess") as mock_sub:
             # pbpaste returns empty
-            mock_sub.run.return_value = MagicMock(
-                returncode=1, stdout=""
-            )
+            mock_sub.run.return_value = MagicMock(returncode=1, stdout="")
             cb = MacOSClipboard()
             cb.paste_text("text")
             pbcopy_calls = [
@@ -88,9 +80,7 @@ class TestMacOSClipboard:
 
     def test_unicode_text(self):
         with patch("transcribe.macos_clipboard.subprocess") as mock_sub:
-            mock_sub.run.return_value = MagicMock(
-                returncode=0, stdout="old"
-            )
+            mock_sub.run.return_value = MagicMock(returncode=0, stdout="old")
             cb = MacOSClipboard()
             cb.paste_text("caf\u00e9 \U0001f600")
             pbcopy_calls = [
@@ -106,9 +96,7 @@ class TestMacOSClipboard:
             patch("transcribe.macos_clipboard.subprocess") as mock_sub,
             patch("transcribe.macos_clipboard.time") as mock_time,
         ):
-            mock_sub.run.return_value = MagicMock(
-                returncode=0, stdout="old"
-            )
+            mock_sub.run.return_value = MagicMock(returncode=0, stdout="old")
             cb = MacOSClipboard()
             cb.paste_text("text")
             sleep_calls = mock_time.sleep.call_args_list

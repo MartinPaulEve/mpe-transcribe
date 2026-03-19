@@ -72,9 +72,7 @@ def request_accessibility() -> bool:
 
         # Build options dict: {kAXTrustedCheckOptionPrompt: True}
         # kAXTrustedCheckOptionPrompt is a CFString constant
-        prompt_key = ctypes.c_void_p.in_dll(
-            lib, "kAXTrustedCheckOptionPrompt"
-        )
+        prompt_key = ctypes.c_void_p.in_dll(lib, "kAXTrustedCheckOptionPrompt")
 
         cf.CFBooleanGetValue.restype = ctypes.c_bool
         cf_true = ctypes.c_void_p.in_dll(cf, "kCFBooleanTrue")
@@ -93,9 +91,7 @@ def request_accessibility() -> bool:
         keys = (ctypes.c_void_p * 1)(prompt_key)
         values = (ctypes.c_void_p * 1)(cf_true)
 
-        options = cf.CFDictionaryCreate(
-            None, keys, values, 1, None, None
-        )
+        options = cf.CFDictionaryCreate(None, keys, values, 1, None, None)
 
         lib.AXIsProcessTrustedWithOptions.restype = ctypes.c_bool
         lib.AXIsProcessTrustedWithOptions.argtypes = [ctypes.c_void_p]
@@ -108,9 +104,7 @@ def request_accessibility() -> bool:
         if trusted:
             logger.info("Accessibility: already trusted.")
         else:
-            logger.info(
-                "Accessibility: not trusted — macOS prompt shown."
-            )
+            logger.info("Accessibility: not trusted — macOS prompt shown.")
         return trusted
     except (OSError, AttributeError, ValueError):
         logger.debug(
@@ -137,8 +131,7 @@ def get_microphone_status() -> str:
         objc = ctypes.cdll.LoadLibrary(objc_path)
 
         avf = ctypes.cdll.LoadLibrary(
-            "/System/Library/Frameworks/"
-            "AVFoundation.framework/AVFoundation"
+            "/System/Library/Frameworks/AVFoundation.framework/AVFoundation"
         )
 
         objc.objc_getClass.restype = ctypes.c_void_p
@@ -155,12 +148,8 @@ def get_microphone_status() -> str:
         )(("objc_msgSend", objc))
 
         cls = objc.objc_getClass(b"AVCaptureDevice")
-        sel = objc.sel_registerName(
-            b"authorizationStatusForMediaType:"
-        )
-        media_type = ctypes.c_void_p.in_dll(
-            avf, "AVMediaTypeAudio"
-        )
+        sel = objc.sel_registerName(b"authorizationStatusForMediaType:")
+        media_type = ctypes.c_void_p.in_dll(avf, "AVMediaTypeAudio")
 
         status = msg_send(cls, sel, media_type)
         return {
@@ -188,17 +177,13 @@ def request_microphone_access() -> bool:
 
         # Opening an input stream triggers the macOS mic prompt.
         # CoreAudio blocks during device init until the user responds.
-        stream = sd.InputStream(
-            samplerate=16000, channels=1, dtype="float32"
-        )
+        stream = sd.InputStream(samplerate=16000, channels=1, dtype="float32")
         stream.start()
         stream.stop()
         stream.close()
         return get_microphone_status() == "authorized"
     except Exception:
-        logger.debug(
-            "Could not request microphone access", exc_info=True
-        )
+        logger.debug("Could not request microphone access", exc_info=True)
         return False
 
 
@@ -248,9 +233,7 @@ _MICROPHONE_SETTINGS_URL = (
 )
 
 
-def _warn_missing_permission(
-    name: str, remediation: str, settings_url: str
-):
+def _warn_missing_permission(name: str, remediation: str, settings_url: str):
     """Warn about a missing permission via notification or dialog."""
     logger.warning(
         "%s permissions not granted. %s",
@@ -264,7 +247,7 @@ def _warn_missing_permission(
                 [
                     "osascript",
                     "-e",
-                    f'display notification '
+                    f"display notification "
                     f'"{name} permissions required — '
                     f'check terminal for details." '
                     f'with title "Transcribe"',

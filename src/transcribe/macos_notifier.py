@@ -11,8 +11,7 @@ class MacOSNotifier:
                 [
                     "osascript",
                     "-e",
-                    f'display notification "{body}" '
-                    f'with title "{title}"',
+                    f'display notification "{body}" with title "{title}"',
                 ],
                 check=False,
             )

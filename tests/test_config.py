@@ -58,23 +58,17 @@ class TestLoadConfig:
         assert DEFAULT_HOTKEY == "ctrl+shift+;"
 
     def test_macos_defaults_are_correct(self):
-        assert DEFAULT_MODEL_MACOS == (
-            "mlx-community/whisper-large-v3-turbo"
-        )
+        assert DEFAULT_MODEL_MACOS == ("mlx-community/whisper-large-v3-turbo")
         assert DEFAULT_HOTKEY_MACOS == "super+shift+'"
 
-    @patch(
-        "transcribe.config.platform.system", return_value="Darwin"
-    )
+    @patch("transcribe.config.platform.system", return_value="Darwin")
     def test_macos_default_model(self, mock_system):
         from transcribe.config import _default_hotkey, _default_model
 
         assert _default_model() == DEFAULT_MODEL_MACOS
         assert _default_hotkey() == DEFAULT_HOTKEY_MACOS
 
-    @patch(
-        "transcribe.config.platform.system", return_value="Linux"
-    )
+    @patch("transcribe.config.platform.system", return_value="Linux")
     def test_linux_default_model(self, mock_system):
         from transcribe.config import _default_hotkey, _default_model
 

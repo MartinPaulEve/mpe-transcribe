@@ -22,9 +22,7 @@ class TestMacOSHotkeyListener:
 
     def test_stop_sets_running_false(self):
         callback = MagicMock()
-        listener = MacOSHotkeyListener(
-            callback, modifiers={"super"}, key="a"
-        )
+        listener = MacOSHotkeyListener(callback, modifiers={"super"}, key="a")
         listener._running = True
         listener._thread = MagicMock()
         listener.stop()
@@ -48,9 +46,7 @@ class TestMacOSHotkeyListener:
 
     def test_rapid_presses_debounced(self):
         callback = MagicMock()
-        listener = MacOSHotkeyListener(
-            callback, modifiers={"super"}, key="a"
-        )
+        listener = MacOSHotkeyListener(callback, modifiers={"super"}, key="a")
 
         listener._on_hotkey()
         listener._on_hotkey()
@@ -61,9 +57,7 @@ class TestMacOSHotkeyListener:
 
     def test_press_after_debounce_window_fires(self):
         callback = MagicMock()
-        listener = MacOSHotkeyListener(
-            callback, modifiers={"super"}, key="a"
-        )
+        listener = MacOSHotkeyListener(callback, modifiers={"super"}, key="a")
 
         listener._on_hotkey()
         time.sleep(0.05)

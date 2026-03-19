@@ -12,15 +12,11 @@ def create_hotkey_listener(callback, modifiers: set[str], key: str):
     if session == "macos":
         from transcribe.macos_hotkey import MacOSHotkeyListener
 
-        return MacOSHotkeyListener(
-            callback, modifiers=modifiers, key=key
-        )
+        return MacOSHotkeyListener(callback, modifiers=modifiers, key=key)
     elif session == "wayland":
         from transcribe.wayland_hotkey import WaylandHotkeyListener
 
-        return WaylandHotkeyListener(
-            callback, modifiers=modifiers, key=key
-        )
+        return WaylandHotkeyListener(callback, modifiers=modifiers, key=key)
     else:
         from transcribe.hotkey import HotkeyListener
 

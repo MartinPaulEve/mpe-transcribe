@@ -65,9 +65,7 @@ class TestFactory:
     def test_create_transcriber_macos(self, mock_detect):
         from transcribe.macos_transcriber import MacOSTranscriber
 
-        t = create_transcriber(
-            "mlx-community/whisper-large-v3-turbo"
-        )
+        t = create_transcriber("mlx-community/whisper-large-v3-turbo")
         assert isinstance(t, MacOSTranscriber)
 
     @patch("transcribe.factory.detect_session", return_value="x11")

@@ -14,9 +14,7 @@ _MODIFIER_MAP = {
 
 
 class MacOSHotkeyListener:
-    def __init__(
-        self, callback, modifiers: set[str] = None, key: str = None
-    ):
+    def __init__(self, callback, modifiers: set[str] = None, key: str = None):
         self._callback = callback
         self._modifiers = modifiers or {"ctrl", "shift"}
         self._key = key or ";"

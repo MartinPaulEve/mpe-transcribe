@@ -17,9 +17,7 @@ class TestIsAccessibilityTrusted:
     def test_returns_true_when_trusted(self):
         mock_lib = MagicMock()
         mock_lib.AXIsProcessTrusted.return_value = True
-        with patch(
-            "transcribe.macos_permissions.ctypes"
-        ) as mock_ctypes:
+        with patch("transcribe.macos_permissions.ctypes") as mock_ctypes:
             mock_ctypes.util.find_library.return_value = "/fake/path"
             mock_ctypes.cdll.LoadLibrary.return_value = mock_lib
             mock_ctypes.c_bool = bool
@@ -28,25 +26,19 @@ class TestIsAccessibilityTrusted:
     def test_returns_false_when_not_trusted(self):
         mock_lib = MagicMock()
         mock_lib.AXIsProcessTrusted.return_value = False
-        with patch(
-            "transcribe.macos_permissions.ctypes"
-        ) as mock_ctypes:
+        with patch("transcribe.macos_permissions.ctypes") as mock_ctypes:
             mock_ctypes.util.find_library.return_value = "/fake/path"
             mock_ctypes.cdll.LoadLibrary.return_value = mock_lib
             mock_ctypes.c_bool = bool
             assert is_accessibility_trusted() is False
 
     def test_returns_true_when_library_not_found(self):
-        with patch(
-            "transcribe.macos_permissions.ctypes"
-        ) as mock_ctypes:
+        with patch("transcribe.macos_permissions.ctypes") as mock_ctypes:
             mock_ctypes.util.find_library.return_value = None
             assert is_accessibility_trusted() is True
 
     def test_returns_true_on_load_error(self):
-        with patch(
-            "transcribe.macos_permissions.ctypes"
-        ) as mock_ctypes:
+        with patch("transcribe.macos_permissions.ctypes") as mock_ctypes:
             mock_ctypes.util.find_library.return_value = "/fake/path"
             mock_ctypes.cdll.LoadLibrary.side_effect = OSError("fail")
             assert is_accessibility_trusted() is True
@@ -54,17 +46,13 @@ class TestIsAccessibilityTrusted:
 
 class TestRequestAccessibility:
     def test_returns_true_when_library_not_found(self):
-        with patch(
-            "transcribe.macos_permissions.ctypes"
-        ) as mock_ctypes:
+        with patch("transcribe.macos_permissions.ctypes") as mock_ctypes:
             mock_ctypes.util.find_library.return_value = None
             assert request_accessibility() is True
 
     def test_falls_back_to_is_trusted_on_error(self):
         with (
-            patch(
-                "transcribe.macos_permissions.ctypes"
-            ) as mock_ctypes,
+            patch("transcribe.macos_permissions.ctypes") as mock_ctypes,
             patch(
                 "transcribe.macos_permissions.is_accessibility_trusted",
                 return_value=True,
@@ -89,9 +77,7 @@ class TestRequestAccessibility:
                 return mock_cf
             return mock_lib
 
-        with patch(
-            "transcribe.macos_permissions.ctypes"
-        ) as mock_ctypes:
+        with patch("transcribe.macos_permissions.ctypes") as mock_ctypes:
             mock_ctypes.util.find_library = fake_find_library
             mock_ctypes.cdll.LoadLibrary = fake_load_library
             mock_ctypes.c_void_p = MagicMock()
@@ -105,16 +91,12 @@ class TestRequestAccessibility:
 
 class TestGetMicrophoneStatus:
     def test_returns_unknown_when_objc_not_found(self):
-        with patch(
-            "transcribe.macos_permissions.ctypes"
-        ) as mock_ctypes:
+        with patch("transcribe.macos_permissions.ctypes") as mock_ctypes:
             mock_ctypes.util.find_library.return_value = None
             assert get_microphone_status() == "unknown"
 
     def test_returns_unknown_on_load_error(self):
-        with patch(
-            "transcribe.macos_permissions.ctypes"
-        ) as mock_ctypes:
+        with patch("transcribe.macos_permissions.ctypes") as mock_ctypes:
             mock_ctypes.util.find_library.return_value = "/fake"
             mock_ctypes.cdll.LoadLibrary.side_effect = OSError("fail")
             assert get_microphone_status() == "unknown"
@@ -163,25 +145,19 @@ class TestRequestMicrophoneAccess:
 
 class TestIsInteractive:
     def test_returns_true_when_tty(self):
-        with patch(
-            "transcribe.macos_permissions.sys"
-        ) as mock_sys:
+        with patch("transcribe.macos_permissions.sys") as mock_sys:
             mock_sys.stdin.isatty.return_value = True
             assert _is_interactive() is True
 
     def test_returns_false_when_not_tty(self):
-        with patch(
-            "transcribe.macos_permissions.sys"
-        ) as mock_sys:
+        with patch("transcribe.macos_permissions.sys") as mock_sys:
             mock_sys.stdin.isatty.return_value = False
             assert _is_interactive() is False
 
 
 class TestShowAlertDialog:
     def test_shows_osascript_dialog(self):
-        with patch(
-            "transcribe.macos_permissions.subprocess"
-        ) as mock_sub:
+        with patch("transcribe.macos_permissions.subprocess") as mock_sub:
             mock_sub.run.return_value = MagicMock(stdout="OK")
             _show_alert_dialog("Title", "Body", "x-apple:test")
             mock_sub.run.assert_called_once()
@@ -190,9 +166,7 @@ class TestShowAlertDialog:
             assert "as critical" in cmd[2]
 
     def test_opens_system_settings_when_chosen(self):
-        with patch(
-            "transcribe.macos_permissions.subprocess"
-        ) as mock_sub:
+        with patch("transcribe.macos_permissions.subprocess") as mock_sub:
             mock_sub.run.return_value = MagicMock(
                 stdout="button returned:Open System Settings"
             )
@@ -203,9 +177,7 @@ class TestShowAlertDialog:
             assert open_cmd[1] == "x-apple:test-url"
 
     def test_does_not_raise_on_failure(self):
-        with patch(
-            "transcribe.macos_permissions.subprocess"
-        ) as mock_sub:
+        with patch("transcribe.macos_permissions.subprocess") as mock_sub:
             mock_sub.run.side_effect = Exception("fail")
             _show_alert_dialog("Title", "Body", "x-apple:test")
 
@@ -217,9 +189,7 @@ class TestWarnMissingPermission:
                 "transcribe.macos_permissions._is_interactive",
                 return_value=True,
             ),
-            patch(
-                "transcribe.macos_permissions.subprocess"
-            ) as mock_sub,
+            patch("transcribe.macos_permissions.subprocess") as mock_sub,
         ):
             _warn_missing_permission("Test", "Fix it.", "x-apple:url")
             mock_sub.run.assert_called_once()

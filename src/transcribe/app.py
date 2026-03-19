@@ -63,9 +63,7 @@ class TranscribeApp:
                         "Failed to start recording. %s",
                         _PORTAUDIO_HINT,
                     )
-                    self._notifier.notify(
-                        "Transcribe", "Mic error — see logs"
-                    )
+                    self._notifier.notify("Transcribe", "Mic error — see logs")
                     self._state = AppState.IDLE
             elif self._state == AppState.RECORDING:
                 self._stop_and_transcribe()

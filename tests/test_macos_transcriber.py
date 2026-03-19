@@ -16,9 +16,7 @@ class TestMacOSTranscriber:
         assert t._model_name == "mlx-community/whisper-large-v3-turbo"
 
     def test_custom_model_name(self):
-        t = MacOSTranscriber(
-            model_name="mlx-community/whisper-small"
-        )
+        t = MacOSTranscriber(model_name="mlx-community/whisper-small")
         assert t._model_name == "mlx-community/whisper-small"
 
     def test_load_model(self):
@@ -29,9 +27,7 @@ class TestMacOSTranscriber:
     def test_transcribe_returns_text(self):
         t = MacOSTranscriber()
         t.load_model()
-        self.mock_mlx.transcribe.return_value = {
-            "text": " hello world "
-        }
+        self.mock_mlx.transcribe.return_value = {"text": " hello world "}
         audio = np.random.randn(16000).astype(np.float32)
         result = t.transcribe(audio, 16000)
         assert result == "hello world"
@@ -49,9 +45,7 @@ class TestMacOSTranscriber:
         assert passed_audio.ndim == 1
 
     def test_transcribe_passes_model_name(self):
-        t = MacOSTranscriber(
-            model_name="mlx-community/whisper-small"
-        )
+        t = MacOSTranscriber(model_name="mlx-community/whisper-small")
         t.load_model()
         self.mock_mlx.transcribe.return_value = {"text": "test"}
         audio = np.zeros(16000, dtype=np.float32)
@@ -69,9 +63,7 @@ class TestMacOSTranscriber:
     def test_transcribe_strips_whitespace(self):
         t = MacOSTranscriber()
         t.load_model()
-        self.mock_mlx.transcribe.return_value = {
-            "text": "  padded text  "
-        }
+        self.mock_mlx.transcribe.return_value = {"text": "  padded text  "}
         audio = np.zeros(16000, dtype=np.float32)
         result = t.transcribe(audio, 16000)
         assert result == "padded text"
