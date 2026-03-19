@@ -18,25 +18,23 @@ fi
 
 # Request microphone permission now (while running interactively).
 # The launchd service has no UI to show the macOS permission prompt,
-# so we must trigger it here. This will show the system dialog if
-# permission has not yet been determined.
+# so we must trigger it here. Uses the Python venv (instant via ctypes,
+# no Swift compilation).
+PYTHON="$SCRIPT_DIR/.venv/bin/python"
 echo "==> Checking microphone permissions..."
-MIC_STATUS=$(swift -e 'import AVFoundation; print(AVCaptureDevice.authorizationStatus(for: .audio).rawValue)' 2>/dev/null || echo "?")
-if [ "$MIC_STATUS" = "0" ]; then
+MIC_STATUS=$("$PYTHON" -c "from transcribe.macos_permissions import get_microphone_status; print(get_microphone_status())" 2>/dev/null || echo "unknown")
+
+if [ "$MIC_STATUS" = "not_determined" ]; then
     echo "==> Requesting microphone access (grant in the system dialog)..."
-    swift -e '
-import AVFoundation
-import Darwin
-let sem = DispatchSemaphore(value: 0)
-var granted = false
-AVCaptureDevice.requestAccess(for: .audio) { g in granted = g; sem.signal() }
-sem.wait()
-if granted { print("granted") } else { print("denied") }
-' 2>/dev/null
+    "$PYTHON" -c "
+from transcribe.macos_permissions import request_microphone_access
+granted = request_microphone_access()
+print('granted' if granted else 'denied')
+" 2>/dev/null
     echo ""
-elif [ "$MIC_STATUS" = "3" ]; then
+elif [ "$MIC_STATUS" = "authorized" ]; then
     echo "    Microphone access already granted."
-elif [ "$MIC_STATUS" = "2" ]; then
+elif [ "$MIC_STATUS" = "denied" ] || [ "$MIC_STATUS" = "restricted" ]; then
     echo "WARNING: Microphone access was previously denied."
     echo "  Go to System Settings → Privacy & Security → Microphone"
     echo "  and toggle access on for your terminal app."

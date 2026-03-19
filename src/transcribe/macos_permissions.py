@@ -47,28 +47,51 @@ def is_accessibility_trusted() -> bool:
 def get_microphone_status() -> str:
     """Return the microphone authorization status.
 
+    Uses the Objective-C runtime via ctypes to call
+    AVCaptureDevice.authorizationStatusForMediaType: directly
+    (no Swift compilation needed — instant).
+
     Returns one of: "authorized", "denied", "restricted",
     "not_determined", or "unknown".
     """
     try:
-        result = subprocess.run(
-            [
-                "swift",
-                "-e",
-                "import AVFoundation; "
-                "print(AVCaptureDevice.authorizationStatus("
-                "for: .audio).rawValue)",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=10,
+        objc_path = ctypes.util.find_library("objc")
+        if objc_path is None:
+            return "unknown"
+        objc = ctypes.cdll.LoadLibrary(objc_path)
+
+        avf = ctypes.cdll.LoadLibrary(
+            "/System/Library/Frameworks/"
+            "AVFoundation.framework/AVFoundation"
         )
-        status = result.stdout.strip()
+
+        objc.objc_getClass.restype = ctypes.c_void_p
+        objc.objc_getClass.argtypes = [ctypes.c_char_p]
+        objc.sel_registerName.restype = ctypes.c_void_p
+        objc.sel_registerName.argtypes = [ctypes.c_char_p]
+
+        # objc_msgSend with signature: (id, SEL, id) -> NSInteger
+        msg_send = ctypes.CFUNCTYPE(
+            ctypes.c_long,
+            ctypes.c_void_p,
+            ctypes.c_void_p,
+            ctypes.c_void_p,
+        )(("objc_msgSend", objc))
+
+        cls = objc.objc_getClass(b"AVCaptureDevice")
+        sel = objc.sel_registerName(
+            b"authorizationStatusForMediaType:"
+        )
+        media_type = ctypes.c_void_p.in_dll(
+            avf, "AVMediaTypeAudio"
+        )
+
+        status = msg_send(cls, sel, media_type)
         return {
-            "0": "not_determined",
-            "1": "restricted",
-            "2": "denied",
-            "3": "authorized",
+            0: "not_determined",
+            1: "restricted",
+            2: "denied",
+            3: "authorized",
         }.get(status, "unknown")
     except Exception:
         logger.debug("Could not check microphone status", exc_info=True)
@@ -78,28 +101,24 @@ def get_microphone_status() -> str:
 def request_microphone_access() -> bool:
     """Trigger the macOS microphone permission prompt.
 
-    This blocks until the user responds to the system dialog.
+    Opens a brief audio input stream via sounddevice, which causes
+    macOS to show the microphone permission dialog on first access.
+    Then re-checks the status to see if it was granted.
+
     Returns True if access was granted.
     """
     try:
-        result = subprocess.run(
-            [
-                "swift",
-                "-e",
-                "import AVFoundation; "
-                "import Darwin; "
-                "let sem = DispatchSemaphore(value: 0); "
-                "var granted = false; "
-                "AVCaptureDevice.requestAccess(for: .audio) { g in "
-                "granted = g; sem.signal() }; "
-                "sem.wait(); "
-                "print(granted)",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=60,
+        import sounddevice as sd
+
+        # Opening an input stream triggers the macOS mic prompt.
+        # CoreAudio blocks during device init until the user responds.
+        stream = sd.InputStream(
+            samplerate=16000, channels=1, dtype="float32"
         )
-        return result.stdout.strip() == "true"
+        stream.start()
+        stream.stop()
+        stream.close()
+        return get_microphone_status() == "authorized"
     except Exception:
         logger.debug(
             "Could not request microphone access", exc_info=True

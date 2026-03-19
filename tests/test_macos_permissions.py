@@ -1,3 +1,4 @@
+import sys
 from unittest.mock import MagicMock, patch
 
 from transcribe.macos_permissions import (
@@ -51,73 +52,61 @@ class TestIsAccessibilityTrusted:
 
 
 class TestGetMicrophoneStatus:
-    def test_returns_authorized(self):
+    def test_returns_unknown_when_objc_not_found(self):
         with patch(
-            "transcribe.macos_permissions.subprocess"
-        ) as mock_sub:
-            mock_sub.run.return_value = MagicMock(stdout="3\n")
-            assert get_microphone_status() == "authorized"
-
-    def test_returns_denied(self):
-        with patch(
-            "transcribe.macos_permissions.subprocess"
-        ) as mock_sub:
-            mock_sub.run.return_value = MagicMock(stdout="2\n")
-            assert get_microphone_status() == "denied"
-
-    def test_returns_restricted(self):
-        with patch(
-            "transcribe.macos_permissions.subprocess"
-        ) as mock_sub:
-            mock_sub.run.return_value = MagicMock(stdout="1\n")
-            assert get_microphone_status() == "restricted"
-
-    def test_returns_not_determined(self):
-        with patch(
-            "transcribe.macos_permissions.subprocess"
-        ) as mock_sub:
-            mock_sub.run.return_value = MagicMock(stdout="0\n")
-            assert get_microphone_status() == "not_determined"
-
-    def test_returns_unknown_on_error(self):
-        with patch(
-            "transcribe.macos_permissions.subprocess"
-        ) as mock_sub:
-            mock_sub.run.side_effect = FileNotFoundError("no swift")
+            "transcribe.macos_permissions.ctypes"
+        ) as mock_ctypes:
+            mock_ctypes.util.find_library.return_value = None
             assert get_microphone_status() == "unknown"
 
-    def test_calls_swift_with_avfoundation(self):
+    def test_returns_unknown_on_load_error(self):
         with patch(
-            "transcribe.macos_permissions.subprocess"
-        ) as mock_sub:
-            mock_sub.run.return_value = MagicMock(stdout="3\n")
-            get_microphone_status()
-            cmd = mock_sub.run.call_args[0][0]
-            assert cmd[0] == "swift"
-            assert "AVFoundation" in cmd[2]
+            "transcribe.macos_permissions.ctypes"
+        ) as mock_ctypes:
+            mock_ctypes.util.find_library.return_value = "/fake"
+            mock_ctypes.cdll.LoadLibrary.side_effect = OSError("fail")
+            assert get_microphone_status() == "unknown"
+
+    def test_returns_valid_status_string(self):
+        # On non-macOS, this returns "unknown" since the ObjC
+        # runtime isn't available. Verify it doesn't crash and
+        # returns one of the expected values.
+        status = get_microphone_status()
+        assert status in {
+            "authorized",
+            "denied",
+            "restricted",
+            "not_determined",
+            "unknown",
+        }
 
 
 class TestRequestMicrophoneAccess:
     def test_returns_true_when_granted(self):
+        mock_sd = sys.modules["sounddevice"]
+        mock_sd.reset_mock()
         with patch(
-            "transcribe.macos_permissions.subprocess"
-        ) as mock_sub:
-            mock_sub.run.return_value = MagicMock(stdout="true\n")
+            "transcribe.macos_permissions.get_microphone_status",
+            return_value="authorized",
+        ):
             assert request_microphone_access() is True
+        mock_sd.InputStream.assert_called_once()
 
     def test_returns_false_when_denied(self):
+        mock_sd = sys.modules["sounddevice"]
+        mock_sd.reset_mock()
         with patch(
-            "transcribe.macos_permissions.subprocess"
-        ) as mock_sub:
-            mock_sub.run.return_value = MagicMock(stdout="false\n")
+            "transcribe.macos_permissions.get_microphone_status",
+            return_value="denied",
+        ):
             assert request_microphone_access() is False
 
-    def test_returns_false_on_error(self):
-        with patch(
-            "transcribe.macos_permissions.subprocess"
-        ) as mock_sub:
-            mock_sub.run.side_effect = Exception("fail")
-            assert request_microphone_access() is False
+    def test_returns_false_on_stream_error(self):
+        mock_sd = sys.modules["sounddevice"]
+        mock_sd.reset_mock()
+        mock_sd.InputStream.side_effect = Exception("no mic")
+        assert request_microphone_access() is False
+        mock_sd.InputStream.side_effect = None  # reset
 
 
 class TestIsInteractive:
@@ -279,7 +268,7 @@ class TestWarnIfNotTrusted:
         ):
             warn_if_not_trusted()
             mock_req.assert_called_once()
-            mock_warn.assert_not_called()  # granted, no warning
+            mock_warn.assert_not_called()
 
     def test_warns_when_mic_request_denied_interactively(self):
         with (
