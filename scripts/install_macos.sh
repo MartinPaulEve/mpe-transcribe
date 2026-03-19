@@ -60,8 +60,10 @@ mkdir -p "$APP_DIR/Contents/MacOS"
 mkdir -p "$APP_DIR/Contents/Resources"
 
 # Info.plist — gives the app a stable bundle identity for TCC.
-# NSMicrophoneUsageDescription is required for the mic permission
-# dialog.  LSBackgroundOnly keeps it out of the Dock.
+# NSMicrophoneUsageDescription is required for the mic permission dialog.
+# LSUIElement makes it a background agent (no Dock icon, no menu bar).
+# NOTE: Do NOT use LSBackgroundOnly — it prevents TCC from granting
+# accessibility to the app.
 cat > "$APP_DIR/Contents/Info.plist" <<INFOPLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
@@ -82,8 +84,6 @@ cat > "$APP_DIR/Contents/Info.plist" <<INFOPLIST
     <string>1.0</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
-    <key>LSBackgroundOnly</key>
-    <true/>
     <key>LSUIElement</key>
     <true/>
     <key>NSMicrophoneUsageDescription</key>
@@ -115,6 +115,7 @@ cc -O2 -o "$APP_DIR/Contents/MacOS/transcribe-launcher" \
     -DHOTKEY_MODIFIERS="$HOTKEY_MODIFIERS" \
     -framework CoreFoundation \
     -framework CoreGraphics \
+    -lobjc \
     "$LAUNCHER_SRC"
 
 echo "    Compiled: $APP_DIR/Contents/MacOS/transcribe-launcher"
@@ -163,13 +164,13 @@ codesign -s - -f --deep "$APP_DIR" 2>/dev/null || true
 
 echo "    Installed: $APP_DIR"
 
-# ── Permissions guidance ──────────────────────────────────────────
-# The launcher handles hotkey monitoring via CGEventTap, which needs
-# the .app bundle to have Accessibility.  Microphone is requested at
-# runtime when the user first records.
-# NOTE: We can't programmatically request accessibility for the .app
-# from Python — AXIsProcessTrustedWithOptions would register the
-# Python binary, not the .app.  The user must add it manually.
+# ── Reset stale TCC entries ──────────────────────────────────────
+# Re-codesigning changes the binary's identity, which invalidates
+# any previous TCC grants.  Reset them so the user gets a clean
+# prompt for the new binary.
+echo "==> Resetting TCC entries for $BUNDLE_ID..."
+tccutil reset Accessibility "$BUNDLE_ID" 2>/dev/null || true
+tccutil reset Microphone "$BUNDLE_ID" 2>/dev/null || true
 
 # ── Install the launchd agent ─────────────────────────────────────
 # The plist runs the native launcher binary directly.  The launcher

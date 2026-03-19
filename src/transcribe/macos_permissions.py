@@ -264,22 +264,35 @@ def _warn_missing_permission(name: str, remediation: str, settings_url: str):
         )
 
 
+def _running_under_launcher() -> bool:
+    """Return True if the native launcher is handling permissions."""
+    import os
+
+    return os.environ.get("TRANSCRIBE_LAUNCHER") == "1"
+
+
 def warn_if_not_trusted():
     """Check accessibility and microphone permissions on macOS.
 
-    In a terminal session, logs warnings and sends notifications.
-    When running as a service (no tty), shows modal alert dialogs
-    that the user must dismiss.
+    When running under the native launcher (TRANSCRIBE_LAUNCHER=1),
+    skip checks — the launcher handles accessibility via CGEventTap,
+    and microphone is checked at recording time, not at startup.
+    The Python child has a different process identity so these checks
+    would always report false negatives.
 
-    If microphone status is not yet determined and we are running
-    interactively, triggers the macOS permission prompt so the user
-    can grant access right away.
+    In a terminal session, logs warnings and sends notifications.
+    When running as a service without the launcher, shows modal
+    alert dialogs that the user must dismiss.
     """
+    if _running_under_launcher():
+        logger.debug(
+            "Running under native launcher — "
+            "skipping permission checks (launcher owns TCC grants)"
+        )
+        return
+
     if not is_accessibility_trusted():
         if _is_interactive():
-            # Show the macOS system dialog prompting the user to grant
-            # accessibility.  This is safe in terminal mode — the prompt
-            # targets the correct process.
             logger.info("Requesting accessibility access...")
             granted = request_accessibility()
             if granted:
@@ -291,8 +304,6 @@ def warn_if_not_trusted():
                     "then restart transcribe."
                 )
         else:
-            # Service mode — can't show an interactive prompt for
-            # the right binary, so just warn.
             _warn_missing_permission(
                 "Accessibility",
                 _ACCESSIBILITY_REMEDIATION,
@@ -311,8 +322,6 @@ def warn_if_not_trusted():
                 logger.info("Microphone access granted.")
                 return
             logger.warning("Microphone access was denied.")
-        # Not interactive + not_determined: service can't prompt
-        # Fall through to warn
 
     _warn_missing_permission(
         "Microphone",
