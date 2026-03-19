@@ -153,6 +153,8 @@ static CGEventRef hotkey_callback(
                 kill(child_pid, SIGUSR1);
             }
         }
+        /* Consume the event — don't pass it to the focused app. */
+        return NULL;
     }
 
     return event;
@@ -224,7 +226,7 @@ int main(int argc, char *argv[]) {
     event_tap = CGEventTapCreate(
         kCGSessionEventTap,
         kCGHeadInsertEventTap,
-        kCGEventTapOptionListenOnly,
+        kCGEventTapOptionDefault,  /* active tap: can block events */
         mask,
         hotkey_callback,
         NULL
