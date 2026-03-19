@@ -16,11 +16,25 @@ if [ ! -x "$TRANSCRIBE_BIN" ]; then
     exit 1
 fi
 
+PYTHON="$SCRIPT_DIR/.venv/bin/python"
+
+# Ad-hoc codesign the Python and transcribe binaries so that macOS
+# TCC can track their permissions. Without a code signature, macOS
+# cannot persist microphone/accessibility grants for CLI tools and
+# they won't appear in System Settings.
+echo "==> Codesigning binaries for macOS permissions..."
+codesign -s - -f "$PYTHON" 2>/dev/null || true
+codesign -s - -f "$TRANSCRIBE_BIN" 2>/dev/null || true
+# Also sign the actual python3 binary (transcribe is a wrapper script)
+PYTHON3_BIN="$(readlink -f "$PYTHON" 2>/dev/null || echo "$PYTHON")"
+if [ "$PYTHON3_BIN" != "$PYTHON" ] && [ -f "$PYTHON3_BIN" ]; then
+    codesign -s - -f "$PYTHON3_BIN" 2>/dev/null || true
+fi
+echo "    Done."
+
 # Request microphone permission now (while running interactively).
 # The launchd service has no UI to show the macOS permission prompt,
-# so we must trigger it here. Uses the Python venv (instant via ctypes,
-# no Swift compilation).
-PYTHON="$SCRIPT_DIR/.venv/bin/python"
+# so we must trigger it here.
 echo "==> Checking microphone permissions..."
 MIC_STATUS=$("$PYTHON" -c "from transcribe.macos_permissions import get_microphone_status; print(get_microphone_status())" 2>/dev/null || echo "unknown")
 
@@ -35,9 +49,10 @@ print('granted' if granted else 'denied')
 elif [ "$MIC_STATUS" = "authorized" ]; then
     echo "    Microphone access already granted."
 elif [ "$MIC_STATUS" = "denied" ] || [ "$MIC_STATUS" = "restricted" ]; then
+    echo ""
     echo "WARNING: Microphone access was previously denied."
-    echo "  Go to System Settings → Privacy & Security → Microphone"
-    echo "  and toggle access on for your terminal app."
+    echo "  Reset with: tccutil reset Microphone"
+    echo "  Then re-run this install script."
     echo ""
 fi
 

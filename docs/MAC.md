@@ -48,13 +48,18 @@ You may need to restart the app after granting permissions.
 
 > **Important:** Without microphone permissions, the app will record silence and transcription will fail. macOS only shows the permission prompt when running interactively (not from a launchd service).
 
-The first time you run `uv run transcribe` from a terminal, macOS will show a permission dialog — click **Allow**. This grants microphone access for your terminal app. If you plan to use the launchd service, you **must** run once from the terminal first so that the permission prompt appears.
+The install script (`./scripts/install_macos.sh`) handles this automatically — it codesigns the binaries (so macOS can track them in System Settings) and triggers the microphone permission prompt. Click **Allow** when the dialog appears.
 
-If you previously denied the prompt, go to **System Settings → Privacy & Security → Microphone** and toggle access on for your terminal app.
+If running manually without the install script, run `uv run transcribe` once from the terminal. macOS will show the permission dialog on first use.
+
+If you previously denied the prompt, reset and try again:
+```bash
+tccutil reset Microphone
+```
 
 ### launchd service (auto-start on login)
 
-An install script sets up a launchd user agent that auto-starts transcribe when you log in:
+An install script sets up a launchd user agent that auto-starts transcribe when you log in. It also codesigns the binaries and requests microphone permission:
 
 ```bash
 ./scripts/install_macos.sh
@@ -118,7 +123,17 @@ All models support multiple languages. The default (large-v3-turbo) is recommend
 
 **Hotkey not working** — Ensure your terminal app has accessibility permissions (System Settings → Privacy & Security → Accessibility).
 
-**"No audio detected" or transcription returns garbage** — Microphone permissions are missing. Run `uv run transcribe` once from the terminal to trigger the macOS permission prompt. If you previously denied it, go to System Settings → Privacy & Security → Microphone and toggle access on for your terminal app.
+**"No audio detected" or transcription returns garbage** — Microphone permissions are missing. Re-run `./scripts/install_macos.sh` which will codesign the binaries and trigger the permission prompt. If you previously denied the prompt, reset first:
+```bash
+tccutil reset Microphone
+./scripts/install_macos.sh
+```
+
+**App not appearing in System Settings → Microphone** — macOS cannot track unsigned CLI binaries. The install script codesigns them automatically. If you skipped the install script, codesign manually:
+```bash
+codesign -s - -f .venv/bin/python3
+codesign -s - -f .venv/bin/transcribe
+```
 
 **Model download hangs** — The first run downloads from Hugging Face. Check your internet connection. Models are cached in `~/.cache/huggingface/`.
 
