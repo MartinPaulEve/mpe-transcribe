@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Install mpe-transcribe as a macOS launchd agent (auto-start on login).
 #
-# Creates a lightweight Transcribe.app wrapper bundle so that macOS TCC
-# can persistently track permissions (accessibility + microphone) via
-# a stable CFBundleIdentifier — no more re-prompting after reboot.
+# Creates a Transcribe.app bundle with a native Mach-O executable so
+# that macOS TCC can persistently track permissions (accessibility +
+# microphone) via a stable CFBundleIdentifier.
 #
-# The launchd plist uses `open -W -a Transcribe.app` so that macOS
-# designates the .app as the "responsible process" for TCC checks.
-# The launcher runs Python as a *child* process (not exec) so the
-# .app's process stays alive and retains its TCC identity.
+# Apple's TCC requires a *native* (Mach-O) CFBundleExecutable — shell
+# scripts and Python interpreters do not get stable TCC identity.
+# We compile a tiny C trampoline that fork/exec's Python as a child
+# process, keeping the native binary alive as the TCC-tracked process.
 set -euo pipefail
 
 PLIST_NAME="com.mpe.transcribe"
@@ -19,6 +19,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 APP_NAME="Transcribe"
 APP_DIR="$HOME/Applications/$APP_NAME.app"
 BUNDLE_ID="com.mpe.transcribe"
+LAUNCHER_SRC="$SCRIPT_DIR/scripts/transcribe_launcher.c"
 
 # ── Locate Python & venv ──────────────────────────────────────────
 PYTHON="$SCRIPT_DIR/.venv/bin/python"
@@ -36,6 +37,13 @@ PYTHON_REAL=$("$PYTHON" -c "import sys; print(sys.executable)" 2>/dev/null || ec
     echo "Install first:  uv pip install -e '.[macos]'"
     exit 1
 }
+
+# Verify C compiler is available (Xcode CLT)
+if ! command -v cc &>/dev/null; then
+    echo "Error: C compiler (cc) not found."
+    echo "Install Xcode Command Line Tools:  xcode-select --install"
+    exit 1
+fi
 
 # ── Unload previous service (if any) ─────────────────────────────
 launchctl stop "$PLIST_NAME" 2>/dev/null || true
@@ -81,33 +89,16 @@ cat > "$APP_DIR/Contents/Info.plist" <<INFOPLIST
 </plist>
 INFOPLIST
 
-# Launcher script — runs Python as a CHILD process (not exec).
-# This keeps the .app's shell process alive as the "responsible
-# process" for macOS TCC, so accessibility and microphone grants
-# are attributed to Transcribe.app (not to the Python binary).
-# SIGTERM/SIGINT are forwarded to the child Python process.
-cat > "$APP_DIR/Contents/MacOS/transcribe-launcher" <<'LAUNCHER_HEAD'
-#!/bin/bash
-LAUNCHER_HEAD
+# Compile the native Mach-O trampoline.
+# The Python path and PYTHONPATH are baked in via -D flags.
+# This gives us a real native executable that TCC can track.
+echo "==> Compiling native launcher..."
+cc -O2 -o "$APP_DIR/Contents/MacOS/transcribe-launcher" \
+    -DPYTHON_BIN="$PYTHON_REAL" \
+    -DPYTHON_PATH="$SCRIPT_DIR/src" \
+    "$LAUNCHER_SRC"
 
-cat >> "$APP_DIR/Contents/MacOS/transcribe-launcher" <<LAUNCHER_BODY
-export PYTHONPATH="$SCRIPT_DIR/src:\${PYTHONPATH:-}"
-
-# Run Python as a child process — do NOT exec.
-"$PYTHON_REAL" -m transcribe "\$@" &
-CHILD=\$!
-
-# Forward termination signals to the child process.
-cleanup() {
-    kill -TERM "\$CHILD" 2>/dev/null
-    wait "\$CHILD" 2>/dev/null
-}
-trap cleanup TERM INT HUP
-
-# Wait for the child to exit.
-wait "\$CHILD"
-LAUNCHER_BODY
-chmod +x "$APP_DIR/Contents/MacOS/transcribe-launcher"
+echo "    Compiled: $APP_DIR/Contents/MacOS/transcribe-launcher"
 
 # Ad-hoc codesign the .app bundle so macOS accepts it.
 # NOTE: We do NOT codesign the Python binary — that would
@@ -158,10 +149,8 @@ else:
 " 2>/dev/null
 
 # ── Install the launchd agent ─────────────────────────────────────
-# The plist uses `open -W -a Transcribe.app` instead of running
-# the launcher directly. This makes macOS treat Transcribe.app as
-# the "responsible process" for TCC — permissions granted to the
-# app persist across reboots via the stable CFBundleIdentifier.
+# The plist uses `open -W -a Transcribe.app` so that macOS
+# designates the .app as the "responsible process" for TCC.
 echo "==> Installing launchd agent..."
 mkdir -p "$PLIST_DIR"
 
