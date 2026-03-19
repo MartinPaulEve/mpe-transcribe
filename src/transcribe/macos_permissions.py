@@ -276,13 +276,28 @@ def warn_if_not_trusted():
     can grant access right away.
     """
     if not is_accessibility_trusted():
-        # Don't call request_accessibility() here — in service mode
-        # it shows a prompt for the wrong binary.  Just warn.
-        _warn_missing_permission(
-            "Accessibility",
-            _ACCESSIBILITY_REMEDIATION,
-            _ACCESSIBILITY_SETTINGS_URL,
-        )
+        if _is_interactive():
+            # Show the macOS system dialog prompting the user to grant
+            # accessibility.  This is safe in terminal mode — the prompt
+            # targets the correct process.
+            logger.info("Requesting accessibility access...")
+            granted = request_accessibility()
+            if granted:
+                logger.info("Accessibility already granted.")
+            else:
+                logger.warning(
+                    "Accessibility not yet granted. "
+                    "Grant it in the dialog or System Settings, "
+                    "then restart transcribe."
+                )
+        else:
+            # Service mode — can't show an interactive prompt for
+            # the right binary, so just warn.
+            _warn_missing_permission(
+                "Accessibility",
+                _ACCESSIBILITY_REMEDIATION,
+                _ACCESSIBILITY_SETTINGS_URL,
+            )
 
     mic_status = get_microphone_status()
     if mic_status == "authorized" or mic_status == "unknown":
