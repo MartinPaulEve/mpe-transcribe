@@ -4,8 +4,9 @@ from transcribe.macos_permissions import (
     _is_interactive,
     _show_alert_dialog,
     _warn_missing_permission,
+    get_microphone_status,
     is_accessibility_trusted,
-    is_microphone_authorized,
+    request_microphone_access,
     warn_if_not_trusted,
 )
 
@@ -49,51 +50,74 @@ class TestIsAccessibilityTrusted:
             assert is_accessibility_trusted() is True
 
 
-class TestIsMicrophoneAuthorized:
-    def test_returns_true_when_authorized(self):
+class TestGetMicrophoneStatus:
+    def test_returns_authorized(self):
         with patch(
             "transcribe.macos_permissions.subprocess"
         ) as mock_sub:
             mock_sub.run.return_value = MagicMock(stdout="3\n")
-            assert is_microphone_authorized() is True
+            assert get_microphone_status() == "authorized"
 
-    def test_returns_false_when_denied(self):
+    def test_returns_denied(self):
         with patch(
             "transcribe.macos_permissions.subprocess"
         ) as mock_sub:
             mock_sub.run.return_value = MagicMock(stdout="2\n")
-            assert is_microphone_authorized() is False
+            assert get_microphone_status() == "denied"
 
-    def test_returns_false_when_restricted(self):
+    def test_returns_restricted(self):
         with patch(
             "transcribe.macos_permissions.subprocess"
         ) as mock_sub:
             mock_sub.run.return_value = MagicMock(stdout="1\n")
-            assert is_microphone_authorized() is False
+            assert get_microphone_status() == "restricted"
 
-    def test_returns_true_when_not_determined(self):
+    def test_returns_not_determined(self):
         with patch(
             "transcribe.macos_permissions.subprocess"
         ) as mock_sub:
             mock_sub.run.return_value = MagicMock(stdout="0\n")
-            assert is_microphone_authorized() is True
+            assert get_microphone_status() == "not_determined"
 
-    def test_returns_true_on_subprocess_error(self):
+    def test_returns_unknown_on_error(self):
         with patch(
             "transcribe.macos_permissions.subprocess"
         ) as mock_sub:
             mock_sub.run.side_effect = FileNotFoundError("no swift")
-            assert is_microphone_authorized() is True
+            assert get_microphone_status() == "unknown"
 
     def test_calls_swift_with_avfoundation(self):
         with patch(
             "transcribe.macos_permissions.subprocess"
         ) as mock_sub:
             mock_sub.run.return_value = MagicMock(stdout="3\n")
-            is_microphone_authorized()
+            get_microphone_status()
             cmd = mock_sub.run.call_args[0][0]
             assert cmd[0] == "swift"
             assert "AVFoundation" in cmd[2]
+
+
+class TestRequestMicrophoneAccess:
+    def test_returns_true_when_granted(self):
+        with patch(
+            "transcribe.macos_permissions.subprocess"
+        ) as mock_sub:
+            mock_sub.run.return_value = MagicMock(stdout="true\n")
+            assert request_microphone_access() is True
+
+    def test_returns_false_when_denied(self):
+        with patch(
+            "transcribe.macos_permissions.subprocess"
+        ) as mock_sub:
+            mock_sub.run.return_value = MagicMock(stdout="false\n")
+            assert request_microphone_access() is False
+
+    def test_returns_false_on_error(self):
+        with patch(
+            "transcribe.macos_permissions.subprocess"
+        ) as mock_sub:
+            mock_sub.run.side_effect = Exception("fail")
+            assert request_microphone_access() is False
 
 
 class TestIsInteractive:
@@ -142,7 +166,6 @@ class TestShowAlertDialog:
             "transcribe.macos_permissions.subprocess"
         ) as mock_sub:
             mock_sub.run.side_effect = Exception("fail")
-            # Should not raise
             _show_alert_dialog("Title", "Body", "x-apple:test")
 
 
@@ -186,8 +209,8 @@ class TestWarnIfNotTrusted:
                 return_value=True,
             ),
             patch(
-                "transcribe.macos_permissions.is_microphone_authorized",
-                return_value=True,
+                "transcribe.macos_permissions.get_microphone_status",
+                return_value="authorized",
             ),
             patch(
                 "transcribe.macos_permissions._warn_missing_permission",
@@ -203,8 +226,8 @@ class TestWarnIfNotTrusted:
                 return_value=False,
             ),
             patch(
-                "transcribe.macos_permissions.is_microphone_authorized",
-                return_value=True,
+                "transcribe.macos_permissions.get_microphone_status",
+                return_value="authorized",
             ),
             patch(
                 "transcribe.macos_permissions._warn_missing_permission",
@@ -214,14 +237,66 @@ class TestWarnIfNotTrusted:
             mock_warn.assert_called_once()
             assert mock_warn.call_args[0][0] == "Accessibility"
 
-    def test_warns_when_microphone_missing(self):
+    def test_warns_when_microphone_denied(self):
         with (
             patch(
                 "transcribe.macos_permissions.is_accessibility_trusted",
                 return_value=True,
             ),
             patch(
-                "transcribe.macos_permissions.is_microphone_authorized",
+                "transcribe.macos_permissions.get_microphone_status",
+                return_value="denied",
+            ),
+            patch(
+                "transcribe.macos_permissions._warn_missing_permission",
+            ) as mock_warn,
+        ):
+            warn_if_not_trusted()
+            mock_warn.assert_called_once()
+            assert mock_warn.call_args[0][0] == "Microphone"
+
+    def test_requests_mic_when_not_determined_and_interactive(self):
+        with (
+            patch(
+                "transcribe.macos_permissions.is_accessibility_trusted",
+                return_value=True,
+            ),
+            patch(
+                "transcribe.macos_permissions.get_microphone_status",
+                return_value="not_determined",
+            ),
+            patch(
+                "transcribe.macos_permissions._is_interactive",
+                return_value=True,
+            ),
+            patch(
+                "transcribe.macos_permissions.request_microphone_access",
+                return_value=True,
+            ) as mock_req,
+            patch(
+                "transcribe.macos_permissions._warn_missing_permission",
+            ) as mock_warn,
+        ):
+            warn_if_not_trusted()
+            mock_req.assert_called_once()
+            mock_warn.assert_not_called()  # granted, no warning
+
+    def test_warns_when_mic_request_denied_interactively(self):
+        with (
+            patch(
+                "transcribe.macos_permissions.is_accessibility_trusted",
+                return_value=True,
+            ),
+            patch(
+                "transcribe.macos_permissions.get_microphone_status",
+                return_value="not_determined",
+            ),
+            patch(
+                "transcribe.macos_permissions._is_interactive",
+                return_value=True,
+            ),
+            patch(
+                "transcribe.macos_permissions.request_microphone_access",
                 return_value=False,
             ),
             patch(
@@ -232,14 +307,18 @@ class TestWarnIfNotTrusted:
             mock_warn.assert_called_once()
             assert mock_warn.call_args[0][0] == "Microphone"
 
-    def test_warns_both_when_both_missing(self):
+    def test_warns_when_not_determined_and_not_interactive(self):
         with (
             patch(
                 "transcribe.macos_permissions.is_accessibility_trusted",
-                return_value=False,
+                return_value=True,
             ),
             patch(
-                "transcribe.macos_permissions.is_microphone_authorized",
+                "transcribe.macos_permissions.get_microphone_status",
+                return_value="not_determined",
+            ),
+            patch(
+                "transcribe.macos_permissions._is_interactive",
                 return_value=False,
             ),
             patch(
@@ -247,7 +326,22 @@ class TestWarnIfNotTrusted:
             ) as mock_warn,
         ):
             warn_if_not_trusted()
-            assert mock_warn.call_count == 2
-            names = [c[0][0] for c in mock_warn.call_args_list]
-            assert "Accessibility" in names
-            assert "Microphone" in names
+            mock_warn.assert_called_once()
+            assert mock_warn.call_args[0][0] == "Microphone"
+
+    def test_skips_mic_check_when_unknown(self):
+        with (
+            patch(
+                "transcribe.macos_permissions.is_accessibility_trusted",
+                return_value=True,
+            ),
+            patch(
+                "transcribe.macos_permissions.get_microphone_status",
+                return_value="unknown",
+            ),
+            patch(
+                "transcribe.macos_permissions._warn_missing_permission",
+            ) as mock_warn,
+        ):
+            warn_if_not_trusted()
+            mock_warn.assert_not_called()

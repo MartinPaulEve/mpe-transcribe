@@ -28,11 +28,13 @@ uv sync --extra macos
 
 The first run will download the Whisper model (~1.4 GB for the default model) from Hugging Face. Subsequent runs use the cached model.
 
-### Accessibility permissions (required)
+### Permissions (required)
 
-> **Important:** Without accessibility permissions, the global hotkey will not work and transcribe will be unable to paste text into other applications. This step is mandatory.
+macOS requires two permissions for transcribe to work. The app checks both at startup and will warn you if either is missing.
 
-macOS requires explicit permission for apps to listen for global keyboard events and simulate keystrokes. Go to:
+#### Accessibility
+
+> **Important:** Without accessibility permissions, the global hotkey will not work and transcribe will be unable to paste text into other applications.
 
 **System Settings → Privacy & Security → Accessibility**
 
@@ -41,6 +43,14 @@ Add the app that runs transcribe to the allowed list:
 - If running as a launchd service: add the `transcribe` binary itself (navigate to the `.venv/bin/transcribe` path inside the project)
 
 You may need to restart the app after granting permissions.
+
+#### Microphone
+
+> **Important:** Without microphone permissions, the app will record silence and transcription will fail. macOS only shows the permission prompt when running interactively (not from a launchd service).
+
+The first time you run `uv run transcribe` from a terminal, macOS will show a permission dialog — click **Allow**. This grants microphone access for your terminal app. If you plan to use the launchd service, you **must** run once from the terminal first so that the permission prompt appears.
+
+If you previously denied the prompt, go to **System Settings → Privacy & Security → Microphone** and toggle access on for your terminal app.
 
 ### launchd service (auto-start on login)
 
@@ -108,13 +118,15 @@ All models support multiple languages. The default (large-v3-turbo) is recommend
 
 **Hotkey not working** — Ensure your terminal app has accessibility permissions (System Settings → Privacy & Security → Accessibility).
 
+**"No audio detected" or transcription returns garbage** — Microphone permissions are missing. Run `uv run transcribe` once from the terminal to trigger the macOS permission prompt. If you previously denied it, go to System Settings → Privacy & Security → Microphone and toggle access on for your terminal app.
+
 **Model download hangs** — The first run downloads from Hugging Face. Check your internet connection. Models are cached in `~/.cache/huggingface/`.
 
 **Service won't start** — Check logs:
 ```bash
 cat /tmp/transcribe.stderr.log
 ```
-Common causes: missing accessibility permissions, or the `transcribe` binary not found (run `uv sync --extra macos` first).
+Common causes: missing accessibility or microphone permissions, or the `transcribe` binary not found (run `uv sync --extra macos` first).
 
 **Service not loading** — If `launchctl start` reports an error, try reloading:
 ```bash

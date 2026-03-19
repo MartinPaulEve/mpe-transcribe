@@ -19,13 +19,13 @@ _ACCESSIBILITY_REMEDIATION = (
 )
 
 _MICROPHONE_REMEDIATION = (
-    "Open System Settings → Privacy & Security → Microphone "
-    "and add this app to the allowed list.\n\n"
-    "If running from a terminal, add your terminal app "
-    "(Terminal.app, iTerm2, etc.).\n\n"
-    "If running as a service, add the transcribe binary "
-    "(.venv/bin/transcribe inside the project folder).\n\n"
-    "You may need to restart after granting permissions."
+    "Microphone access must be granted before running as a "
+    "service. Run 'uv run transcribe' once from the terminal — "
+    "macOS will show a permission prompt. Grant access, then "
+    "Ctrl+C and start the service.\n\n"
+    "If you previously denied the prompt, go to "
+    "System Settings → Privacy & Security → Microphone "
+    "and toggle access on for your terminal app."
 )
 
 
@@ -44,11 +44,11 @@ def is_accessibility_trusted() -> bool:
         return True  # can't determine — assume OK
 
 
-def is_microphone_authorized() -> bool:
-    """Return True if this process has microphone permissions.
+def get_microphone_status() -> str:
+    """Return the microphone authorization status.
 
-    Uses AVFoundation via a swift subprocess to check the
-    authorization status.  Returns 3 (authorized) on success.
+    Returns one of: "authorized", "denied", "restricted",
+    "not_determined", or "unknown".
     """
     try:
         result = subprocess.run(
@@ -64,17 +64,47 @@ def is_microphone_authorized() -> bool:
             timeout=10,
         )
         status = result.stdout.strip()
-        # 0=notDetermined, 1=restricted, 2=denied, 3=authorized
-        if status == "3":
-            return True
-        if status in ("1", "2"):
-            return False
-        # notDetermined (0) or unexpected — assume OK so macOS
-        # can show its own prompt on first use
-        return True
+        return {
+            "0": "not_determined",
+            "1": "restricted",
+            "2": "denied",
+            "3": "authorized",
+        }.get(status, "unknown")
     except Exception:
         logger.debug("Could not check microphone status", exc_info=True)
-        return True  # can't determine — assume OK
+        return "unknown"
+
+
+def request_microphone_access() -> bool:
+    """Trigger the macOS microphone permission prompt.
+
+    This blocks until the user responds to the system dialog.
+    Returns True if access was granted.
+    """
+    try:
+        result = subprocess.run(
+            [
+                "swift",
+                "-e",
+                "import AVFoundation; "
+                "import Darwin; "
+                "let sem = DispatchSemaphore(value: 0); "
+                "var granted = false; "
+                "AVCaptureDevice.requestAccess(for: .audio) { g in "
+                "granted = g; sem.signal() }; "
+                "sem.wait(); "
+                "print(granted)",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        return result.stdout.strip() == "true"
+    except Exception:
+        logger.debug(
+            "Could not request microphone access", exc_info=True
+        )
+        return False
 
 
 def _is_interactive() -> bool:
@@ -162,6 +192,10 @@ def warn_if_not_trusted():
     In a terminal session, logs warnings and sends notifications.
     When running as a service (no tty), shows modal alert dialogs
     that the user must dismiss.
+
+    If microphone status is not yet determined and we are running
+    interactively, triggers the macOS permission prompt so the user
+    can grant access right away.
     """
     if not is_accessibility_trusted():
         _warn_missing_permission(
@@ -170,9 +204,23 @@ def warn_if_not_trusted():
             _ACCESSIBILITY_SETTINGS_URL,
         )
 
-    if not is_microphone_authorized():
-        _warn_missing_permission(
-            "Microphone",
-            _MICROPHONE_REMEDIATION,
-            _MICROPHONE_SETTINGS_URL,
-        )
+    mic_status = get_microphone_status()
+    if mic_status == "authorized" or mic_status == "unknown":
+        return
+
+    if mic_status == "not_determined":
+        if _is_interactive():
+            logger.info("Requesting microphone access...")
+            granted = request_microphone_access()
+            if granted:
+                logger.info("Microphone access granted.")
+                return
+            logger.warning("Microphone access was denied.")
+        # Not interactive + not_determined: service can't prompt
+        # Fall through to warn
+
+    _warn_missing_permission(
+        "Microphone",
+        _MICROPHONE_REMEDIATION,
+        _MICROPHONE_SETTINGS_URL,
+    )

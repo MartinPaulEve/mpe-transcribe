@@ -16,6 +16,33 @@ if [ ! -x "$TRANSCRIBE_BIN" ]; then
     exit 1
 fi
 
+# Request microphone permission now (while running interactively).
+# The launchd service has no UI to show the macOS permission prompt,
+# so we must trigger it here. This will show the system dialog if
+# permission has not yet been determined.
+echo "==> Checking microphone permissions..."
+MIC_STATUS=$(swift -e 'import AVFoundation; print(AVCaptureDevice.authorizationStatus(for: .audio).rawValue)' 2>/dev/null || echo "?")
+if [ "$MIC_STATUS" = "0" ]; then
+    echo "==> Requesting microphone access (grant in the system dialog)..."
+    swift -e '
+import AVFoundation
+import Darwin
+let sem = DispatchSemaphore(value: 0)
+var granted = false
+AVCaptureDevice.requestAccess(for: .audio) { g in granted = g; sem.signal() }
+sem.wait()
+if granted { print("granted") } else { print("denied") }
+' 2>/dev/null
+    echo ""
+elif [ "$MIC_STATUS" = "3" ]; then
+    echo "    Microphone access already granted."
+elif [ "$MIC_STATUS" = "2" ]; then
+    echo "WARNING: Microphone access was previously denied."
+    echo "  Go to System Settings → Privacy & Security → Microphone"
+    echo "  and toggle access on for your terminal app."
+    echo ""
+fi
+
 mkdir -p "$PLIST_DIR"
 
 cat > "$PLIST_PATH" <<PLIST
@@ -47,7 +74,7 @@ launchctl load "$PLIST_PATH" 2>/dev/null || true
 echo "Installed launchd agent: $PLIST_PATH"
 echo "The service will start automatically on login."
 echo ""
-echo "IMPORTANT: Grant accessibility permissions to your terminal"
+echo "IMPORTANT: Grant accessibility permissions"
 echo "  System Settings → Privacy & Security → Accessibility"
 echo "  Add your terminal app (Terminal.app, iTerm2, etc.)"
 echo ""
