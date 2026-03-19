@@ -104,6 +104,7 @@ IDLE ──[hotkey]──> RECORDING ──[hotkey]──> TRANSCRIBING ──[d
 
 | Module | Responsibility |
 |---|---|
+| `__main__.py` | Allows running the package with `python -m transcribe` |
 | `app.py` | State machine orchestrator |
 | `session.py` | Detects macOS vs X11 vs Wayland session |
 | `factory.py` | Creates the correct backend for the session (hotkey, clipboard, transcriber, notifier) |
@@ -118,8 +119,11 @@ IDLE ──[hotkey]──> RECORDING ──[hotkey]──> TRANSCRIBING ──[d
 | `notifier.py` | Linux: desktop notifications via `notify-send` + audible ding |
 | `macos_notifier.py` | macOS: desktop notifications via `osascript` + audible ding |
 | `clipboard.py` | X11: clipboard save/set/paste/restore via xclip + xdotool |
+| `clipboard_content.py` | Clipboard data model and MIME-type target selection |
 | `wayland_clipboard.py` | Wayland: clipboard via wl-clipboard + ydotool (experimental) |
 | `macos_clipboard.py` | macOS: clipboard via pbcopy/pbpaste, paste via native launcher (CGEventPost) or osascript |
+| `macos_permissions.py` | macOS: checks accessibility and microphone TCC permissions |
+| `scripts/transcribe_launcher.c` | Native Mach-O launcher for Transcribe.app; registers a Carbon global hotkey and sends SIGUSR1 to the Python child process, compiled at install time by `install_macos.sh` |
 
 ## Tested on
 
