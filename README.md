@@ -113,12 +113,13 @@ IDLE ──[hotkey]──> RECORDING ──[hotkey]──> TRANSCRIBING ──[d
 | `macos_transcriber.py` | macOS: mlx-whisper model inference |
 | `hotkey.py` | X11: global hotkey via `XGrabKey` |
 | `wayland_hotkey.py` | Wayland: global hotkey via evdev (experimental) |
-| `macos_hotkey.py` | macOS: global hotkey via pynput (Quartz event taps) |
+| `signal_hotkey.py` | macOS (service): hotkey via SIGUSR1 from native launcher |
+| `macos_hotkey.py` | macOS (terminal): global hotkey via pynput (Quartz event taps) |
 | `notifier.py` | Linux: desktop notifications via `notify-send` + audible ding |
 | `macos_notifier.py` | macOS: desktop notifications via `osascript` + audible ding |
 | `clipboard.py` | X11: clipboard save/set/paste/restore via xclip + xdotool |
 | `wayland_clipboard.py` | Wayland: clipboard via wl-clipboard + ydotool (experimental) |
-| `macos_clipboard.py` | macOS: clipboard via pbcopy/pbpaste + osascript |
+| `macos_clipboard.py` | macOS: clipboard via pbcopy/pbpaste, paste via native launcher (CGEventPost) or osascript |
 
 ## Tested on
 
