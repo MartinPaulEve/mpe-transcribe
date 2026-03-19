@@ -291,6 +291,61 @@ static bool setup_eventtap_fallback(void) {
     return true;
 }
 
+/* ── Cmd+V paste (called from SIGUSR2) ─────────────────────────── */
+
+/*
+ * Post a synthetic Cmd+V keystroke via CGEventPost.
+ * This must run in the launcher (the .app binary with NSApplication)
+ * because CGEventPost requires the process to be a GUI app with
+ * proper window-server context — the forked Python child doesn't
+ * have that when running as a launchd service.
+ *
+ * NOTE: signal handlers should only call async-signal-safe functions.
+ * CGEventPost is NOT async-signal-safe, so we schedule it on the
+ * run loop instead of calling it directly from the signal handler.
+ */
+
+#define kVK_ANSI_V 0x09
+
+static void do_paste_cmd_v(CFRunLoopTimerRef timer,
+                           void *info) {
+    (void)info;
+
+    CGEventRef down = CGEventCreateKeyboardEvent(NULL, kVK_ANSI_V, true);
+    CGEventSetFlags(down, kCGEventFlagMaskCommand);
+    CGEventPost(kCGHIDEventTap, down);
+    CFRelease(down);
+
+    usleep(10000);  /* 10 ms between down and up */
+
+    CGEventRef up = CGEventCreateKeyboardEvent(NULL, kVK_ANSI_V, false);
+    CGEventSetFlags(up, kCGEventFlagMaskCommand);
+    CGEventPost(kCGHIDEventTap, up);
+    CFRelease(up);
+
+    CFRunLoopTimerInvalidate(timer);
+}
+
+static void on_sigusr2(int sig) {
+    (void)sig;
+    /*
+     * Schedule the paste on the main run loop so CGEventPost
+     * runs outside the signal handler context.
+     */
+    if (!main_loop) return;
+
+    CFRunLoopTimerRef timer = CFRunLoopTimerCreate(
+        NULL,
+        CFAbsoluteTimeGetCurrent(),  /* fire immediately */
+        0,                           /* non-repeating */
+        0, 0,
+        do_paste_cmd_v,
+        NULL
+    );
+    CFRunLoopAddTimer(main_loop, timer, kCFRunLoopCommonModes);
+    CFRelease(timer);
+}
+
 /* ── Signal handlers ────────────────────────────────────────────── */
 
 static void stop_event_loop(void) {
@@ -348,6 +403,7 @@ int main(int argc, char *argv[]) {
     signal(SIGINT, forward_signal);
     signal(SIGHUP, forward_signal);
     signal(SIGCHLD, on_sigchld);
+    signal(SIGUSR2, on_sigusr2);
 
     /*
      * Try RegisterEventHotKey first (consumes keystroke, no

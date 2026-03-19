@@ -1,52 +1,31 @@
-import ctypes
-import ctypes.util
+import os
+import signal
 import subprocess
 import time
 
-# --- CoreGraphics via ctypes for Cmd+V keystroke ---
-_cg_path = ctypes.util.find_library("CoreGraphics")
-_cg = ctypes.cdll.LoadLibrary(_cg_path) if _cg_path else None
-
-if _cg:
-    _cg.CGEventCreateKeyboardEvent.restype = ctypes.c_void_p
-    _cg.CGEventCreateKeyboardEvent.argtypes = [
-        ctypes.c_void_p,  # source (NULL)
-        ctypes.c_uint16,  # virtualKey
-        ctypes.c_bool,    # keyDown
-    ]
-    _cg.CGEventSetFlags.restype = None
-    _cg.CGEventSetFlags.argtypes = [ctypes.c_void_p, ctypes.c_uint64]
-    _cg.CGEventPost.restype = None
-    _cg.CGEventPost.argtypes = [ctypes.c_uint32, ctypes.c_void_p]
-
-    _cf_path = ctypes.util.find_library("CoreFoundation")
-    _cf = ctypes.cdll.LoadLibrary(_cf_path)
-    _cf.CFRelease.restype = None
-    _cf.CFRelease.argtypes = [ctypes.c_void_p]
-
-_kCGEventFlagMaskCommand = 0x00100000
-_kCGHIDEventTap = 0  # post at HID level
-_kVK_ANSI_V = 0x09
-
 
 def _post_cmd_v():
-    """Simulate Cmd+V keystroke via CGEventPost."""
-    if not _cg:
-        raise RuntimeError("CoreGraphics not available")
+    """Ask the native launcher to simulate Cmd+V via CGEventPost.
 
-    # Key down
-    down = _cg.CGEventCreateKeyboardEvent(None, _kVK_ANSI_V, True)
-    _cg.CGEventSetFlags(down, _kCGEventFlagMaskCommand)
-    _cg.CGEventPost(_kCGHIDEventTap, down)
-    _cf.CFRelease(down)
+    When running under the launcher (TRANSCRIBE_LAUNCHER=1), we send
+    SIGUSR2 to the parent process — the .app binary that has the GUI
+    session context needed for CGEventPost to reach the focused app.
 
-    time.sleep(0.01)
-
-    # Key up
-    up = _cg.CGEventCreateKeyboardEvent(None, _kVK_ANSI_V, False)
-    _cg.CGEventSetFlags(up, _kCGEventFlagMaskCommand)
-    _cg.CGEventPost(_kCGHIDEventTap, up)
-    _cf.CFRelease(up)
+    When running standalone (e.g. during development), fall back to
+    osascript.
+    """
+    if os.environ.get("TRANSCRIBE_LAUNCHER"):
+        os.kill(os.getppid(), signal.SIGUSR2)
+    else:
+        subprocess.run(
+            [
+                "osascript",
+                "-e",
+                'tell application "System Events" to '
+                'keystroke "v" using command down',
+            ],
+            check=True,
+        )
 
 
 class MacOSClipboard:
