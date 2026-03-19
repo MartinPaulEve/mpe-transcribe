@@ -5,7 +5,10 @@ from transcribe.macos_clipboard import MacOSClipboard
 
 class TestMacOSClipboard:
     def test_sets_clipboard_via_pbcopy(self):
-        with patch("transcribe.macos_clipboard.subprocess") as mock_sub:
+        with (
+            patch("transcribe.macos_clipboard.subprocess") as mock_sub,
+            patch("transcribe.macos_clipboard._post_cmd_v"),
+        ):
             mock_sub.run.return_value = MagicMock(
                 returncode=0, stdout="old text"
             )
@@ -35,24 +38,21 @@ class TestMacOSClipboard:
             assert len(pbpaste_calls) == 1
             assert result == "existing text"
 
-    def test_simulates_cmd_v_via_osascript(self):
-        with patch("transcribe.macos_clipboard.subprocess") as mock_sub:
+    def test_simulates_cmd_v_via_cgevent(self):
+        with (
+            patch("transcribe.macos_clipboard.subprocess") as mock_sub,
+            patch("transcribe.macos_clipboard._post_cmd_v") as mock_cmd_v,
+        ):
             mock_sub.run.return_value = MagicMock(returncode=0, stdout="old")
             cb = MacOSClipboard()
             cb.paste_text("text")
-            osascript_calls = [
-                c
-                for c in mock_sub.run.call_args_list
-                if c[0][0][0] == "osascript"
-            ]
-            assert len(osascript_calls) == 1
-            # Should contain keystroke "v" using command down
-            script = osascript_calls[0][0][0][2]
-            assert "keystroke" in script
-            assert "command down" in script
+            mock_cmd_v.assert_called_once()
 
     def test_saves_and_restores_clipboard(self):
-        with patch("transcribe.macos_clipboard.subprocess") as mock_sub:
+        with (
+            patch("transcribe.macos_clipboard.subprocess") as mock_sub,
+            patch("transcribe.macos_clipboard._post_cmd_v"),
+        ):
             mock_sub.run.return_value = MagicMock(
                 returncode=0, stdout="previous"
             )
@@ -65,7 +65,10 @@ class TestMacOSClipboard:
             assert len(last_pbcopy) == 2
 
     def test_empty_clipboard_skips_restore(self):
-        with patch("transcribe.macos_clipboard.subprocess") as mock_sub:
+        with (
+            patch("transcribe.macos_clipboard.subprocess") as mock_sub,
+            patch("transcribe.macos_clipboard._post_cmd_v"),
+        ):
             # pbpaste returns empty
             mock_sub.run.return_value = MagicMock(returncode=1, stdout="")
             cb = MacOSClipboard()
@@ -79,7 +82,10 @@ class TestMacOSClipboard:
             assert len(pbcopy_calls) == 1
 
     def test_unicode_text(self):
-        with patch("transcribe.macos_clipboard.subprocess") as mock_sub:
+        with (
+            patch("transcribe.macos_clipboard.subprocess") as mock_sub,
+            patch("transcribe.macos_clipboard._post_cmd_v"),
+        ):
             mock_sub.run.return_value = MagicMock(returncode=0, stdout="old")
             cb = MacOSClipboard()
             cb.paste_text("caf\u00e9 \U0001f600")
@@ -94,6 +100,7 @@ class TestMacOSClipboard:
     def test_restore_delay(self):
         with (
             patch("transcribe.macos_clipboard.subprocess") as mock_sub,
+            patch("transcribe.macos_clipboard._post_cmd_v"),
             patch("transcribe.macos_clipboard.time") as mock_time,
         ):
             mock_sub.run.return_value = MagicMock(returncode=0, stdout="old")
