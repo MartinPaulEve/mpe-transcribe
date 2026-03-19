@@ -33,6 +33,15 @@ class TestFactory:
         listener = create_hotkey_listener(cb, {"super"}, "a")
         assert isinstance(listener, MacOSHotkeyListener)
 
+    @patch.dict("os.environ", {"TRANSCRIBE_LAUNCHER": "1"})
+    @patch("transcribe.factory.detect_session", return_value="macos")
+    def test_create_hotkey_listener_macos_launcher(self, mock_detect):
+        from transcribe.signal_hotkey import SignalHotkeyListener
+
+        cb = MagicMock()
+        listener = create_hotkey_listener(cb, {"super"}, "'")
+        assert isinstance(listener, SignalHotkeyListener)
+
     @patch("transcribe.factory.detect_session", return_value="x11")
     def test_create_clipboard_x11(self, mock_detect):
         from transcribe.clipboard import Clipboard

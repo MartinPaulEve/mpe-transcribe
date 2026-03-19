@@ -7,8 +7,9 @@
 #
 # Apple's TCC requires a *native* (Mach-O) CFBundleExecutable — shell
 # scripts and Python interpreters do not get stable TCC identity.
-# We compile a tiny C trampoline that fork/exec's Python as a child
-# process, keeping the native binary alive as the TCC-tracked process.
+# We compile a C launcher that monitors the global hotkey via
+# CGEventTap (using the .app's accessibility grant) and signals the
+# Python child with SIGUSR1 when the hotkey is pressed.
 set -euo pipefail
 
 PLIST_NAME="com.mpe.transcribe"
@@ -91,13 +92,29 @@ cat > "$APP_DIR/Contents/Info.plist" <<INFOPLIST
 </plist>
 INFOPLIST
 
-# Compile the native Mach-O trampoline.
-# The Python path and PYTHONPATH are baked in via -D flags.
-# This gives us a real native executable that TCC can track.
+# Read hotkey config and convert to CGEventTap values (keycode + modifiers).
+echo "==> Reading hotkey configuration..."
+read HOTKEY_KEYCODE HOTKEY_MODIFIERS <<< $("$PYTHON" -c "
+from transcribe.config import load_config, hotkey_to_cg_values
+cfg = load_config()
+kc, mf = hotkey_to_cg_values(cfg['hotkey'])
+print(f'0x{kc:02x} 0x{mf:06x}')
+" 2>/dev/null || echo "0x27 0x120000")  # fallback: Cmd+Shift+'
+
+echo "    Hotkey keycode=$HOTKEY_KEYCODE modifiers=$HOTKEY_MODIFIERS"
+
+# Compile the native Mach-O launcher.
+# The launcher monitors the global hotkey via CGEventTap (which gets
+# accessibility from the .app's TCC grant) and signals the Python
+# child with SIGUSR1 when the hotkey is pressed.
 echo "==> Compiling native launcher..."
 cc -O2 -o "$APP_DIR/Contents/MacOS/transcribe-launcher" \
     -DPYTHON_BIN="$PYTHON_REAL" \
     -DPYTHON_PATH="$SCRIPT_DIR/src" \
+    -DHOTKEY_KEYCODE="$HOTKEY_KEYCODE" \
+    -DHOTKEY_MODIFIERS="$HOTKEY_MODIFIERS" \
+    -framework CoreFoundation \
+    -framework CoreGraphics \
     "$LAUNCHER_SRC"
 
 echo "    Compiled: $APP_DIR/Contents/MacOS/transcribe-launcher"
@@ -146,30 +163,18 @@ codesign -s - -f --deep "$APP_DIR" 2>/dev/null || true
 
 echo "    Installed: $APP_DIR"
 
-# ── Request permissions interactively ─────────────────────────────
-# Microphone permission is requested at runtime when the user first
-# records, so we only need to check accessibility here.
-
-# Accessibility: prompt the user to grant it.
-echo "==> Checking accessibility permissions..."
-"$PYTHON" -c "
-from transcribe.macos_permissions import request_accessibility
-trusted = request_accessibility()
-if trusted:
-    print('    Accessibility already granted.')
-else:
-    print()
-    print('    macOS will prompt you to grant Accessibility access.')
-    print('    Add \"$APP_NAME\" in System Settings → Privacy & Security → Accessibility')
-    print()
-" 2>/dev/null
+# ── Permissions guidance ──────────────────────────────────────────
+# The launcher handles hotkey monitoring via CGEventTap, which needs
+# the .app bundle to have Accessibility.  Microphone is requested at
+# runtime when the user first records.
+# NOTE: We can't programmatically request accessibility for the .app
+# from Python — AXIsProcessTrustedWithOptions would register the
+# Python binary, not the .app.  The user must add it manually.
 
 # ── Install the launchd agent ─────────────────────────────────────
-# The plist runs the native launcher binary directly (not via `open`).
-# TCC identity comes from the binary living inside a signed .app bundle
-# with an Info.plist — `open` is not required for that.
-# Running the binary directly means launchctl stop sends SIGTERM to the
-# launcher, which forwards it to the Python child for clean shutdown.
+# The plist runs the native launcher binary directly.  The launcher
+# monitors the hotkey via CGEventTap (with the .app's TCC grant) and
+# forwards SIGTERM to the Python child for clean shutdown.
 echo "==> Installing launchd agent..."
 mkdir -p "$PLIST_DIR"
 

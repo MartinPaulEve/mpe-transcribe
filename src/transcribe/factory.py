@@ -1,4 +1,5 @@
 import logging
+import os
 
 from transcribe.session import detect_session
 
@@ -10,6 +11,10 @@ def create_hotkey_listener(callback, modifiers: set[str], key: str):
     session = detect_session()
     logger.info("Session type: %s", session)
     if session == "macos":
+        if os.environ.get("TRANSCRIBE_LAUNCHER") == "1":
+            from transcribe.signal_hotkey import SignalHotkeyListener
+
+            return SignalHotkeyListener(callback)
         from transcribe.macos_hotkey import MacOSHotkeyListener
 
         return MacOSHotkeyListener(callback, modifiers=modifiers, key=key)

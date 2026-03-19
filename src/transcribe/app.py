@@ -121,7 +121,11 @@ class TranscribeApp:
             self._state = AppState.IDLE
 
     def run(self):
-        logging.basicConfig(level=logging.INFO)
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s %(levelname)s:%(name)s:%(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
         logger.info("Model: %s", self._config["model"])
         logger.info("Hotkey: %s", self._config["hotkey"])
         if detect_session() == "macos":

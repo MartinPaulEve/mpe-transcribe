@@ -7,6 +7,7 @@ from transcribe.config import (
     DEFAULT_HOTKEY_MACOS,
     DEFAULT_MODEL,
     DEFAULT_MODEL_MACOS,
+    hotkey_to_cg_values,
     load_config,
     parse_hotkey,
 )
@@ -74,3 +75,19 @@ class TestLoadConfig:
 
         assert _default_model() == DEFAULT_MODEL
         assert _default_hotkey() == DEFAULT_HOTKEY
+
+
+class TestHotkeyToCgValues:
+    def test_super_shift_quote(self):
+        keycode, modflags = hotkey_to_cg_values("super+shift+'")
+        assert keycode == 0x27  # kVK_ANSI_Quote
+        assert modflags == 0x120000  # Cmd+Shift
+
+    def test_ctrl_shift_semicolon(self):
+        keycode, modflags = hotkey_to_cg_values("ctrl+shift+;")
+        assert keycode == 0x29  # kVK_ANSI_Semicolon
+        assert modflags == 0x060000  # Ctrl+Shift
+
+    def test_unknown_key_raises(self):
+        with pytest.raises(ValueError, match="No macOS keycode"):
+            hotkey_to_cg_values("ctrl+shift+f12")
