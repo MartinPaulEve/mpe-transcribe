@@ -123,6 +123,7 @@ IDLE ──[hotkey]──> RECORDING ──[hotkey]──> TRANSCRIBING ──[d
 ## Tested on
 
 - **macOS:** Mac M3 Pro (Apple Silicon), macOS 14.2.1 (Sonoma)
+- **Linux:** Ubuntu 22.04, X11. Wayland has not been tested.
 
 ## Notes
 
