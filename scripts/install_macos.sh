@@ -73,6 +73,8 @@ cat > "$APP_DIR/Contents/Info.plist" <<INFOPLIST
     <string>$APP_NAME</string>
     <key>CFBundleDisplayName</key>
     <string>$APP_NAME</string>
+    <key>CFBundleIconFile</key>
+    <string>Transcribe</string>
     <key>CFBundleExecutable</key>
     <string>transcribe-launcher</string>
     <key>CFBundleVersion</key>
@@ -108,31 +110,43 @@ codesign -s - -f --deep "$APP_DIR" 2>/dev/null || true
 
 echo "    Installed: $APP_DIR"
 
-# ── Request permissions interactively ─────────────────────────────
-# Microphone: must be triggered interactively before running as a
-# service, because launchd agents cannot show TCC prompts.
-echo "==> Checking microphone permissions..."
-MIC_STATUS=$("$PYTHON" -c "from transcribe.macos_permissions import get_microphone_status; print(get_microphone_status())" 2>/dev/null || echo "unknown")
+# ── Generate .icns icon ──────────────────────────────────────────
+# Converts the SVG icon to .icns so the app has a proper icon in
+# macOS permission dialogs (Privacy & Security → Microphone, etc.)
+ICON_SVG="$SCRIPT_DIR/assets/transcribe.svg"
+ICON_ICNS="$APP_DIR/Contents/Resources/Transcribe.icns"
 
-if [ "$MIC_STATUS" = "not_determined" ]; then
-    echo "==> Requesting microphone access (grant in the system dialog)..."
-    "$PYTHON" -c "
-from transcribe.macos_permissions import request_microphone_access
-granted = request_microphone_access()
-print('Microphone access ' + ('granted' if granted else 'denied'))
-" 2>/dev/null
-    echo ""
-elif [ "$MIC_STATUS" = "authorized" ]; then
-    echo "    Microphone access already granted."
-elif [ "$MIC_STATUS" = "denied" ] || [ "$MIC_STATUS" = "restricted" ]; then
-    echo ""
-    echo "WARNING: Microphone access was previously denied."
-    echo "  Go to System Settings → Privacy & Security → Microphone"
-    echo "  and toggle access on for '$APP_NAME' (or your terminal app)."
-    echo "  Alternatively, reset with:  tccutil reset Microphone"
-    echo "  Then re-run this install script."
-    echo ""
+if [ -f "$ICON_SVG" ]; then
+    echo "==> Generating app icon..."
+    ICON_TMP=$(mktemp -d)
+    ICONSET_DIR="$ICON_TMP/Transcribe.iconset"
+    mkdir -p "$ICONSET_DIR"
+
+    # Render SVG to a large PNG via QuickLook
+    qlmanage -t -s 1024 -o "$ICON_TMP" "$ICON_SVG" &>/dev/null
+    ICON_PNG="$ICON_TMP/transcribe.svg.png"
+
+    if [ -f "$ICON_PNG" ]; then
+        # Create all required icon sizes
+        for size in 16 32 128 256 512; do
+            sips -z "$size" "$size" "$ICON_PNG" --out "$ICONSET_DIR/icon_${size}x${size}.png" &>/dev/null
+            double=$((size * 2))
+            sips -z "$double" "$double" "$ICON_PNG" --out "$ICONSET_DIR/icon_${size}x${size}@2x.png" &>/dev/null
+        done
+
+        iconutil -c icns -o "$ICON_ICNS" "$ICONSET_DIR" 2>/dev/null && \
+            echo "    Icon installed: $ICON_ICNS" || \
+            echo "    Warning: could not generate .icns (non-fatal)"
+    else
+        echo "    Warning: could not render SVG to PNG (non-fatal)"
+    fi
+
+    rm -rf "$ICON_TMP"
 fi
+
+# ── Request permissions interactively ─────────────────────────────
+# Microphone permission is requested at runtime when the user first
+# records, so we only need to check accessibility here.
 
 # Accessibility: prompt the user to grant it.
 echo "==> Checking accessibility permissions..."
