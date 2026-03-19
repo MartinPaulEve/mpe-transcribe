@@ -139,6 +139,52 @@ static void init_nsapp(void) {
     ((void (*)(id, SEL, long))objc_msgSend)(app, policy_sel, 1);
 }
 
+/*
+ * Request accessibility permission.  CGEventPost needs it to deliver
+ * synthetic keyboard events to other apps.  Calling with
+ * kAXTrustedCheckOptionPrompt makes macOS show the System Settings
+ * dialog if not already granted.
+ */
+static void request_accessibility(void) {
+    Boolean (*AXIsProcessTrustedWithOptions)(CFDictionaryRef) = NULL;
+
+    void *handle = dlopen(
+        "/System/Library/Frameworks/ApplicationServices.framework"
+        "/ApplicationServices",
+        RTLD_LAZY);
+    if (handle) {
+        AXIsProcessTrustedWithOptions = dlsym(
+            handle, "AXIsProcessTrustedWithOptions");
+    }
+
+    if (!AXIsProcessTrustedWithOptions) {
+        fprintf(stderr,
+            "transcribe-launcher: WARNING — "
+            "cannot check accessibility (API unavailable)\n");
+        return;
+    }
+
+    /* kAXTrustedCheckOptionPrompt = "AXTrustedCheckOptionPrompt" */
+    CFStringRef key = CFStringCreateWithCString(
+        NULL, "AXTrustedCheckOptionPrompt", kCFStringEncodingUTF8);
+    CFDictionaryRef opts = CFDictionaryCreate(
+        NULL,
+        (const void **)&key,
+        (const void **)&kCFBooleanTrue,
+        1,
+        &kCFTypeDictionaryKeyCallBacks,
+        &kCFTypeDictionaryValueCallBacks
+    );
+
+    Boolean trusted = AXIsProcessTrustedWithOptions(opts);
+    CFRelease(opts);
+    CFRelease(key);
+
+    fprintf(stderr,
+        "transcribe-launcher: accessibility %s\n",
+        trusted ? "granted" : "NOT granted — check System Settings");
+}
+
 static void log_diagnostics(void) {
     CFBundleRef bundle = CFBundleGetMainBundle();
     if (bundle) {
@@ -390,6 +436,7 @@ static void on_sigchld(int sig) {
 int main(int argc, char *argv[]) {
     init_nsapp();
     log_diagnostics();
+    request_accessibility();
 
     /* Set PYTHONPATH so the transcribe package is importable. */
     const char *existing = getenv("PYTHONPATH");
