@@ -10,21 +10,18 @@ logger = logging.getLogger(__name__)
 
 _ACCESSIBILITY_REMEDIATION = (
     "Open System Settings → Privacy & Security → Accessibility "
-    "and add the Python binary to the allowed list.\n\n"
-    "Find the binary with:  python -c \"import sys; print(sys.executable)\"\n\n"
-    "If running from a terminal, add your terminal app "
-    "(Terminal.app, iTerm2, etc.) instead.\n\n"
-    "You may need to restart after granting permissions."
+    "and toggle on 'Transcribe' (or add your terminal app if "
+    "running from the terminal).\n\n"
+    "You may need to restart the service after granting permissions."
 )
 
 _MICROPHONE_REMEDIATION = (
     "Microphone access must be granted before running as a "
-    "service. Run 'uv run transcribe' once from the terminal — "
-    "macOS will show a permission prompt. Grant access, then "
-    "Ctrl+C and start the service.\n\n"
-    "If you previously denied the prompt, reset with:\n"
-    "  tccutil reset Microphone\n"
-    "Then run 'uv run transcribe' again."
+    "service. Go to System Settings → Privacy & Security → "
+    "Microphone and toggle on 'Transcribe'.\n\n"
+    "If it doesn't appear, run the install script again:\n"
+    "  ./scripts/install_macos.sh\n"
+    "It will prompt for microphone access interactively."
 )
 
 
@@ -295,7 +292,9 @@ def warn_if_not_trusted():
     interactively, triggers the macOS permission prompt so the user
     can grant access right away.
     """
-    if not request_accessibility():
+    if not is_accessibility_trusted():
+        # Don't call request_accessibility() here — in service mode
+        # it shows a prompt for the wrong binary.  Just warn.
         _warn_missing_permission(
             "Accessibility",
             _ACCESSIBILITY_REMEDIATION,

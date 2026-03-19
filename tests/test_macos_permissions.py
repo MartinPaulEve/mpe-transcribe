@@ -246,7 +246,7 @@ class TestWarnIfNotTrusted:
     def test_no_warnings_when_all_granted(self):
         with (
             patch(
-                "transcribe.macos_permissions.request_accessibility",
+                "transcribe.macos_permissions.is_accessibility_trusted",
                 return_value=True,
             ),
             patch(
@@ -263,7 +263,7 @@ class TestWarnIfNotTrusted:
     def test_warns_when_accessibility_missing(self):
         with (
             patch(
-                "transcribe.macos_permissions.request_accessibility",
+                "transcribe.macos_permissions.is_accessibility_trusted",
                 return_value=False,
             ),
             patch(
@@ -281,7 +281,7 @@ class TestWarnIfNotTrusted:
     def test_warns_when_microphone_denied(self):
         with (
             patch(
-                "transcribe.macos_permissions.request_accessibility",
+                "transcribe.macos_permissions.is_accessibility_trusted",
                 return_value=True,
             ),
             patch(
@@ -299,7 +299,7 @@ class TestWarnIfNotTrusted:
     def test_requests_mic_when_not_determined_and_interactive(self):
         with (
             patch(
-                "transcribe.macos_permissions.request_accessibility",
+                "transcribe.macos_permissions.is_accessibility_trusted",
                 return_value=True,
             ),
             patch(
@@ -325,7 +325,7 @@ class TestWarnIfNotTrusted:
     def test_warns_when_mic_request_denied_interactively(self):
         with (
             patch(
-                "transcribe.macos_permissions.request_accessibility",
+                "transcribe.macos_permissions.is_accessibility_trusted",
                 return_value=True,
             ),
             patch(
@@ -351,7 +351,7 @@ class TestWarnIfNotTrusted:
     def test_warns_when_not_determined_and_not_interactive(self):
         with (
             patch(
-                "transcribe.macos_permissions.request_accessibility",
+                "transcribe.macos_permissions.is_accessibility_trusted",
                 return_value=True,
             ),
             patch(
@@ -373,7 +373,7 @@ class TestWarnIfNotTrusted:
     def test_skips_mic_check_when_unknown(self):
         with (
             patch(
-                "transcribe.macos_permissions.request_accessibility",
+                "transcribe.macos_permissions.is_accessibility_trusted",
                 return_value=True,
             ),
             patch(
