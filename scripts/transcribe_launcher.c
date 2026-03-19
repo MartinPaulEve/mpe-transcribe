@@ -71,6 +71,7 @@ static pid_t child_pid = 0;
 static CFRunLoopRef main_loop = NULL;
 static CFMachPortRef event_tap = NULL;
 static double last_press = 0.0;
+static int paste_pipe[2] = { -1, -1 };  /* read, write */
 
 /* ── Helpers ────────────────────────────────────────────────────── */
 
@@ -291,59 +292,78 @@ static bool setup_eventtap_fallback(void) {
     return true;
 }
 
-/* ── Cmd+V paste (called from SIGUSR2) ─────────────────────────── */
+/* ── Cmd+V paste (triggered via pipe from Python child) ────────── */
 
 /*
  * Post a synthetic Cmd+V keystroke via CGEventPost.
- * This must run in the launcher (the .app binary with NSApplication)
+ * This runs in the launcher (the .app binary with NSApplication)
  * because CGEventPost requires the process to be a GUI app with
  * proper window-server context — the forked Python child doesn't
  * have that when running as a launchd service.
  *
- * NOTE: signal handlers should only call async-signal-safe functions.
- * CGEventPost is NOT async-signal-safe, so we schedule it on the
- * run loop instead of calling it directly from the signal handler.
+ * The Python child writes a byte to TRANSCRIBE_PASTE_FD when it
+ * wants Cmd+V.  We monitor the read end via CFFileDescriptor on
+ * the main run loop, so the callback fires safely on the run loop.
  */
 
 #define kVK_ANSI_V 0x09
 
-static void do_paste_cmd_v(CFRunLoopTimerRef timer,
-                           void *info) {
+static void paste_pipe_callback(
+    CFFileDescriptorRef fdref,
+    CFOptionFlags flags,
+    void *info
+) {
+    (void)flags;
     (void)info;
 
-    CGEventRef down = CGEventCreateKeyboardEvent(NULL, kVK_ANSI_V, true);
+    /* Drain the byte(s) the child wrote. */
+    char buf[16];
+    read(paste_pipe[0], buf, sizeof(buf));
+
+    fprintf(stderr, "transcribe-launcher: posting Cmd+V\n");
+
+    CGEventRef down = CGEventCreateKeyboardEvent(
+        NULL, kVK_ANSI_V, true);
     CGEventSetFlags(down, kCGEventFlagMaskCommand);
     CGEventPost(kCGHIDEventTap, down);
     CFRelease(down);
 
     usleep(10000);  /* 10 ms between down and up */
 
-    CGEventRef up = CGEventCreateKeyboardEvent(NULL, kVK_ANSI_V, false);
+    CGEventRef up = CGEventCreateKeyboardEvent(
+        NULL, kVK_ANSI_V, false);
     CGEventSetFlags(up, kCGEventFlagMaskCommand);
     CGEventPost(kCGHIDEventTap, up);
     CFRelease(up);
 
-    CFRunLoopTimerInvalidate(timer);
+    /* Re-enable the callback for the next paste request. */
+    CFFileDescriptorEnableCallBacks(
+        fdref, kCFFileDescriptorReadCallBack);
 }
 
-static void on_sigusr2(int sig) {
-    (void)sig;
-    /*
-     * Schedule the paste on the main run loop so CGEventPost
-     * runs outside the signal handler context.
-     */
-    if (!main_loop) return;
-
-    CFRunLoopTimerRef timer = CFRunLoopTimerCreate(
+static void setup_paste_pipe_source(void) {
+    CFFileDescriptorRef fdref = CFFileDescriptorCreate(
         NULL,
-        CFAbsoluteTimeGetCurrent(),  /* fire immediately */
-        0,                           /* non-repeating */
-        0, 0,
-        do_paste_cmd_v,
+        paste_pipe[0],
+        false,  /* don't close fd on invalidate */
+        paste_pipe_callback,
         NULL
     );
-    CFRunLoopAddTimer(main_loop, timer, kCFRunLoopCommonModes);
-    CFRelease(timer);
+    if (!fdref) {
+        fprintf(stderr,
+            "transcribe-launcher: CFFileDescriptorCreate failed\n");
+        return;
+    }
+
+    CFFileDescriptorEnableCallBacks(
+        fdref, kCFFileDescriptorReadCallBack);
+
+    CFRunLoopSourceRef src = CFFileDescriptorCreateRunLoopSource(
+        NULL, fdref, 0);
+    CFRunLoopAddSource(
+        CFRunLoopGetCurrent(), src, kCFRunLoopCommonModes);
+    CFRelease(src);
+    /* fdref kept alive by the run loop source */
 }
 
 /* ── Signal handlers ────────────────────────────────────────────── */
@@ -386,6 +406,12 @@ int main(int argc, char *argv[]) {
 
     setenv("TRANSCRIBE_LAUNCHER", "1", 1);
 
+    /* Create a pipe for the child to request Cmd+V paste. */
+    if (pipe(paste_pipe) < 0) {
+        perror("pipe");
+        return 1;
+    }
+
     child_pid = fork();
     if (child_pid < 0) {
         perror("fork");
@@ -393,17 +419,25 @@ int main(int argc, char *argv[]) {
     }
 
     if (child_pid == 0) {
+        /* Child: close read end, export write end as env var. */
+        close(paste_pipe[0]);
+        char fd_str[16];
+        snprintf(fd_str, sizeof(fd_str), "%d", paste_pipe[1]);
+        setenv("TRANSCRIBE_PASTE_FD", fd_str, 1);
         execl(STR(PYTHON_BIN), "python", "-m", "transcribe", NULL);
         perror("execl");
         _exit(1);
     }
+
+    /* Parent: close write end, keep read end for monitoring. */
+    close(paste_pipe[1]);
+    paste_pipe[1] = -1;
 
     /* Parent: set up signal handlers. */
     signal(SIGTERM, forward_signal);
     signal(SIGINT, forward_signal);
     signal(SIGHUP, forward_signal);
     signal(SIGCHLD, on_sigchld);
-    signal(SIGUSR2, on_sigusr2);
 
     /*
      * Try RegisterEventHotKey first (consumes keystroke, no
@@ -427,6 +461,9 @@ int main(int argc, char *argv[]) {
             "  Then restart: launchctl stop com.mpe.transcribe && "
             "launchctl start com.mpe.transcribe\n");
     }
+
+    /* Monitor the paste pipe on the run loop. */
+    setup_paste_pipe_source();
 
     /* RunApplicationEventLoop dispatches Carbon hotkey events
      * (which CFRunLoopRun alone does NOT).  It also dispatches

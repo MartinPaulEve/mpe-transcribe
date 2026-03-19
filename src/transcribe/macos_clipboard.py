@@ -1,21 +1,22 @@
 import os
-import signal
 import subprocess
 import time
 
 
 def _post_cmd_v():
-    """Ask the native launcher to simulate Cmd+V via CGEventPost.
+    """Request a Cmd+V keystroke.
 
-    When running under the launcher (TRANSCRIBE_LAUNCHER=1), we send
-    SIGUSR2 to the parent process — the .app binary that has the GUI
-    session context needed for CGEventPost to reach the focused app.
+    When running under the launcher (TRANSCRIBE_PASTE_FD is set), we
+    write a byte to the pipe — the launcher's run loop picks it up and
+    posts CGEventPost(Cmd+V) from the .app process which has the GUI
+    session context.
 
     When running standalone (e.g. during development), fall back to
     osascript.
     """
-    if os.environ.get("TRANSCRIBE_LAUNCHER"):
-        os.kill(os.getppid(), signal.SIGUSR2)
+    paste_fd = os.environ.get("TRANSCRIBE_PASTE_FD")
+    if paste_fd:
+        os.write(int(paste_fd), b"\x01")
     else:
         subprocess.run(
             [
