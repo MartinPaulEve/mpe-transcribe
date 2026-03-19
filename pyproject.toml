@@ -60,7 +60,7 @@ packages = ["src/transcribe"]
 
 # Hotkey as modifier+key string. Modifiers: ctrl, shift, alt, super
 # Key: any single character or key name
-# Default: "ctrl+shift+;" on Linux, "super+shift+;" on macOS (Cmd+Shift+;)
+# Default: "ctrl+shift+;" on Linux, "super+shift+'" on macOS (Cmd+Shift+')
 # hotkey = "ctrl+shift+;"
 
 [tool.ruff]

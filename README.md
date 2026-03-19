@@ -24,7 +24,7 @@ Edit the `[tool.transcribe]` section in `pyproject.toml`:
 # model = "mlx-community/whisper-large-v3-turbo"  # macOS
 
 # hotkey = "ctrl+shift+;"     # Linux default
-# hotkey = "super+shift+;"    # macOS default (Cmd+Shift+;)
+# hotkey = "super+shift+'"    # macOS default (Cmd+Shift+')
 ```
 
 The app automatically selects the appropriate model and hotkey for your platform. Override in `pyproject.toml` only if you want a non-default choice.
@@ -40,7 +40,7 @@ Examples:
 
 ```toml
 hotkey = "ctrl+shift+;"       # Linux default
-hotkey = "super+shift+;"      # macOS default (Cmd+Shift+;)
+hotkey = "super+shift+'"      # macOS default (Cmd+Shift+')
 hotkey = "ctrl+alt+t"
 hotkey = "super+shift+space"
 ```

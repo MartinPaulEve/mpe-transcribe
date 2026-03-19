@@ -61,7 +61,7 @@ class TestLoadConfig:
         assert DEFAULT_MODEL_MACOS == (
             "mlx-community/whisper-large-v3-turbo"
         )
-        assert DEFAULT_HOTKEY_MACOS == "super+shift+;"
+        assert DEFAULT_HOTKEY_MACOS == "super+shift+'"
 
     @patch(
         "transcribe.config.platform.system", return_value="Darwin"

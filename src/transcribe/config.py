@@ -6,7 +6,7 @@ DEFAULT_MODEL = "nvidia/parakeet-tdt-0.6b-v3"
 DEFAULT_HOTKEY = "ctrl+shift+;"
 
 DEFAULT_MODEL_MACOS = "mlx-community/whisper-large-v3-turbo"
-DEFAULT_HOTKEY_MACOS = "super+shift+;"
+DEFAULT_HOTKEY_MACOS = "super+shift+'"
 
 
 def _default_model() -> str:
