@@ -2,7 +2,7 @@
 
 Local voice transcription with a global hotkey. Press the hotkey to start recording, press it again to stop. The audio is transcribed on-device and the resulting text is pasted into the active application.
 
-Supports **Linux** (X11/Wayland with NVIDIA Parakeet) and **macOS** (Apple Silicon with mlx-whisper).
+Supports **Linux** (X11/Wayland with NVIDIA Parakeet), **macOS** (Apple Silicon with mlx-whisper), and **Windows** (NVIDIA Parakeet).
 
 ---
 
@@ -10,6 +10,7 @@ Supports **Linux** (X11/Wayland with NVIDIA Parakeet) and **macOS** (Apple Silic
 
 - **[Linux](docs/LINUX.md)** — X11/Wayland, NVIDIA GPU, systemd service
 - **[macOS](docs/MAC.md)** — Apple Silicon, launchd service
+- **[Windows](docs/WINDOWS.md)** — NVIDIA GPU, manual launch
 
 ---
 
@@ -20,10 +21,10 @@ Edit the `[tool.transcribe]` section in `pyproject.toml`:
 ```toml
 [tool.transcribe]
 # Uncomment to override the platform default:
-# model = "nvidia/parakeet-tdt-0.6b-v3"      # Linux
+# model = "nvidia/parakeet-tdt-0.6b-v3"      # Linux / Windows
 # model = "mlx-community/whisper-large-v3-turbo"  # macOS
 
-# hotkey = "ctrl+shift+;"     # Linux default
+# hotkey = "ctrl+shift+;"     # Linux / Windows default
 # hotkey = "super+shift+'"    # macOS default (Cmd+Shift+')
 ```
 
@@ -33,7 +34,7 @@ The app automatically selects the appropriate model and hotkey for your platform
 
 The hotkey string uses `+`-separated modifier and key names:
 
-- **Modifiers:** `ctrl`, `shift`, `alt`, `super` (super = Cmd on macOS)
+- **Modifiers:** `ctrl`, `shift`, `alt`, `super` (super = Cmd on macOS, Win key on Windows)
 - **Key:** any single character (`;`, `a`, `/`, etc.)
 
 Examples:
@@ -106,7 +107,7 @@ IDLE ──[hotkey]──> RECORDING ──[hotkey]──> TRANSCRIBING ──[d
 |---|---|
 | `__main__.py` | Allows running the package with `python -m transcribe` |
 | `app.py` | State machine orchestrator |
-| `session.py` | Detects macOS vs X11 vs Wayland session |
+| `session.py` | Detects macOS vs Windows vs X11 vs Wayland session |
 | `factory.py` | Creates the correct backend for the session (hotkey, clipboard, transcriber, notifier) |
 | `config.py` | Reads `[tool.transcribe]` from pyproject.toml, platform-aware defaults |
 | `recorder.py` | 16 kHz mono audio capture via PortAudio |
@@ -122,6 +123,10 @@ IDLE ──[hotkey]──> RECORDING ──[hotkey]──> TRANSCRIBING ──[d
 | `clipboard_content.py` | Clipboard data model and MIME-type target selection |
 | `wayland_clipboard.py` | Wayland: clipboard via wl-clipboard + ydotool (experimental) |
 | `macos_clipboard.py` | macOS: clipboard via pbcopy/pbpaste, paste via native launcher (CGEventPost) or osascript |
+| `windows_transcriber.py` | Windows: NeMo Parakeet model inference |
+| `windows_hotkey.py` | Windows: global hotkey via pynput |
+| `windows_notifier.py` | Windows: toast notifications via PowerShell + audible ding |
+| `windows_clipboard.py` | Windows: clipboard via Win32 API (ctypes), paste via SendInput |
 | `macos_permissions.py` | macOS: checks accessibility and microphone TCC permissions |
 | `scripts/transcribe_launcher.c` | Native Mach-O launcher for Transcribe.app; registers a Carbon global hotkey and sends SIGUSR1 to the Python child process, compiled at install time by `install_macos.sh` |
 
@@ -129,6 +134,7 @@ IDLE ──[hotkey]──> RECORDING ──[hotkey]──> TRANSCRIBING ──[d
 
 - **macOS:** Mac M3 Pro (Apple Silicon), macOS 14.2.1 (Sonoma)
 - **Linux:** Ubuntu 22.04, X11. Wayland has not been tested.
+- **Windows:** Windows 10/11 with NVIDIA GPU and CUDA. Requires manual testing.
 
 ## Notes
 

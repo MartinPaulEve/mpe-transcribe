@@ -50,3 +50,13 @@ class TestDetectSession:
     def test_macos_takes_priority_over_x11(self, mock_system):
         """macOS detection should take priority over XDG env vars."""
         assert detect_session() == "macos"
+
+    @patch("transcribe.session.platform.system", return_value="Windows")
+    def test_windows_detected(self, mock_system):
+        assert detect_session() == "windows"
+
+    @patch("transcribe.session.platform.system", return_value="Windows")
+    @patch.dict("os.environ", {"XDG_SESSION_TYPE": "x11"}, clear=False)
+    def test_windows_takes_priority_over_x11_env(self, mock_system):
+        """Windows detection should take priority over XDG env vars."""
+        assert detect_session() == "windows"

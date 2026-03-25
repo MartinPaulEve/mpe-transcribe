@@ -76,6 +76,13 @@ class TestLoadConfig:
         assert _default_model() == DEFAULT_MODEL
         assert _default_hotkey() == DEFAULT_HOTKEY
 
+    @patch("transcribe.config.platform.system", return_value="Windows")
+    def test_windows_default_model(self, mock_system):
+        from transcribe.config import _default_hotkey, _default_model
+
+        assert _default_model() == DEFAULT_MODEL
+        assert _default_hotkey() == DEFAULT_HOTKEY
+
 
 class TestHotkeyToCgValues:
     def test_super_shift_quote(self):

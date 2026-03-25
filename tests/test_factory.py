@@ -90,3 +90,32 @@ class TestFactory:
 
         n = create_notifier()
         assert isinstance(n, MacOSNotifier)
+
+    @patch("transcribe.factory.detect_session", return_value="windows")
+    def test_create_hotkey_listener_windows(self, mock_detect):
+        from transcribe.windows_hotkey import WindowsHotkeyListener
+
+        cb = MagicMock()
+        listener = create_hotkey_listener(cb, {"ctrl"}, "a")
+        assert isinstance(listener, WindowsHotkeyListener)
+
+    @patch("transcribe.factory.detect_session", return_value="windows")
+    def test_create_clipboard_windows(self, mock_detect):
+        from transcribe.windows_clipboard import WindowsClipboard
+
+        cb = create_clipboard()
+        assert isinstance(cb, WindowsClipboard)
+
+    @patch("transcribe.factory.detect_session", return_value="windows")
+    def test_create_transcriber_windows(self, mock_detect):
+        from transcribe.windows_transcriber import WindowsTranscriber
+
+        t = create_transcriber("nvidia/parakeet-tdt-0.6b-v3")
+        assert isinstance(t, WindowsTranscriber)
+
+    @patch("transcribe.factory.detect_session", return_value="windows")
+    def test_create_notifier_windows(self, mock_detect):
+        from transcribe.windows_notifier import WindowsNotifier
+
+        n = create_notifier()
+        assert isinstance(n, WindowsNotifier)

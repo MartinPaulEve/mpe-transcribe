@@ -3,12 +3,14 @@ import platform
 
 
 def detect_session() -> str:
-    """Detect whether the session is macOS, Wayland, or X11.
+    """Detect whether the session is macOS, Windows, Wayland, or X11.
 
-    Returns "macos", "wayland", or "x11".
+    Returns "macos", "windows", "wayland", or "x11".
     """
     if platform.system() == "Darwin":
         return "macos"
+    if platform.system() == "Windows":
+        return "windows"
     session_type = os.environ.get("XDG_SESSION_TYPE", "")
     if session_type == "wayland":
         return "wayland"

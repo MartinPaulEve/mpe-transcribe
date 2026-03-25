@@ -18,6 +18,10 @@ def create_hotkey_listener(callback, modifiers: set[str], key: str):
         from transcribe.macos_hotkey import MacOSHotkeyListener
 
         return MacOSHotkeyListener(callback, modifiers=modifiers, key=key)
+    elif session == "windows":
+        from transcribe.windows_hotkey import WindowsHotkeyListener
+
+        return WindowsHotkeyListener(callback, modifiers=modifiers, key=key)
     elif session == "wayland":
         from transcribe.wayland_hotkey import WaylandHotkeyListener
 
@@ -35,6 +39,10 @@ def create_clipboard():
         from transcribe.macos_clipboard import MacOSClipboard
 
         return MacOSClipboard()
+    elif session == "windows":
+        from transcribe.windows_clipboard import WindowsClipboard
+
+        return WindowsClipboard()
     elif session == "wayland":
         from transcribe.wayland_clipboard import WaylandClipboard
 
@@ -52,6 +60,10 @@ def create_transcriber(model_name: str):
         from transcribe.macos_transcriber import MacOSTranscriber
 
         return MacOSTranscriber(model_name=model_name)
+    elif session == "windows":
+        from transcribe.windows_transcriber import WindowsTranscriber
+
+        return WindowsTranscriber(model_name=model_name)
     else:
         from transcribe.transcriber import Transcriber
 
@@ -65,6 +77,10 @@ def create_notifier():
         from transcribe.macos_notifier import MacOSNotifier
 
         return MacOSNotifier()
+    elif session == "windows":
+        from transcribe.windows_notifier import WindowsNotifier
+
+        return WindowsNotifier()
     else:
         from transcribe.notifier import AppNotifier
 

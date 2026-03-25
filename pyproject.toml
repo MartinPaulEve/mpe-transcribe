@@ -1,7 +1,7 @@
 [project]
 name = "transcribe"
 version = "1.4.0"
-description = "Voice transcription app with global hotkey — supports Linux (Nvidia Parakeet) and macOS (mlx-whisper)"
+description = "Voice transcription app with global hotkey — supports Linux, macOS, and Windows"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -19,6 +19,10 @@ linux = [
 ]
 macos = [
     "mlx-whisper",
+    "pynput",
+]
+windows = [
+    "nemo_toolkit[asr]",
     "pynput",
 ]
 
@@ -53,6 +57,10 @@ packages = ["src/transcribe"]
 #   "mlx-community/whisper-small"          - faster startup, lower accuracy (~488MB)
 #   "mlx-community/whisper-base"           - fastest, lowest accuracy (~142MB)
 #
+# Windows model choices (requires NVIDIA GPU with CUDA):
+#   "nvidia/parakeet-tdt-0.6b-v3"   - fast, lightweight (~2GB VRAM, default on Windows)
+#   "nvidia/parakeet-rnnt-1.1b"     - slower, higher accuracy (~4GB VRAM)
+#
 # The default model is selected automatically based on your platform.
 # Uncomment one of the lines below to override:
 # model = "nvidia/parakeet-tdt-0.6b-v3"
@@ -60,7 +68,7 @@ packages = ["src/transcribe"]
 
 # Hotkey as modifier+key string. Modifiers: ctrl, shift, alt, super
 # Key: any single character or key name
-# Default: "ctrl+shift+;" on Linux, "super+shift+'" on macOS (Cmd+Shift+')
+# Default: "ctrl+shift+;" on Linux/Windows, "super+shift+'" on macOS (Cmd+Shift+')
 # hotkey = "ctrl+shift+;"
 
 [tool.ruff]
