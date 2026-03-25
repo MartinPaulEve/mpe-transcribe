@@ -1,6 +1,6 @@
 [project]
 name = "transcribe"
-version = "1.4.0"
+version = "1.5.0"
 description = "Voice transcription app with global hotkey — supports Linux, macOS, and Windows"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -30,7 +30,7 @@ windows = [
 transcribe = "transcribe.app:main"
 
 [tool.commitizen]
-version = "1.4.0"
+version = "1.5.0"
 version_files = [
     "__version__.py",
     "pyproject.toml:version",

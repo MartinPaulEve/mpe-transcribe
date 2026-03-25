@@ -1,3 +1,10 @@
+## 1.5.0 (2026-03-25)
+
+### Feat
+
+- **recorder**: check USB audio device health before recording
+- **windows**: add Windows platform support
+
 ## 1.4.0 (2026-03-19)
 
 ### Feat
