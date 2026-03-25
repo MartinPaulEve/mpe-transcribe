@@ -176,3 +176,25 @@ class TestApp:
         mock_rec.stop.assert_called_once()
         assert app.state == AppState.IDLE
         mock_hk.stop.assert_called_once()
+
+    @patch(
+        "transcribe.app.check_default_input_device",
+        return_value=(False, "USB audio device is in error state"),
+    )
+    def test_device_error_prevents_recording(self, mock_check):
+        app, mock_rec, _, _, mock_notif, _ = self._make_app()
+        app.toggle()
+        assert app.state == AppState.IDLE
+        mock_rec.start.assert_not_called()
+        mock_notif.notify.assert_called_once()
+        assert "error" in mock_notif.notify.call_args[0][1].lower()
+
+    @patch(
+        "transcribe.app.check_default_input_device",
+        return_value=(True, ""),
+    )
+    def test_device_ok_allows_recording(self, mock_check):
+        app, mock_rec, _, _, _, _ = self._make_app()
+        app.toggle()
+        assert app.state == AppState.RECORDING
+        mock_rec.start.assert_called_once()

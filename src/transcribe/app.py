@@ -6,6 +6,7 @@ from enum import Enum
 import numpy as np
 
 from transcribe.config import load_config, parse_hotkey
+from transcribe.device_check import check_default_input_device
 from transcribe.factory import (
     create_clipboard,
     create_hotkey_listener,
@@ -69,6 +70,12 @@ class TranscribeApp:
                 self._stop_and_transcribe()
 
     def _start_recording(self):
+        ok, msg = check_default_input_device()
+        if not ok:
+            logger.error("Device check failed: %s", msg)
+            self._notifier.notify("Transcribe", msg)
+            self._state = AppState.IDLE
+            return
         self._notifier.notify_and_ding("Transcribe", "Recording...")
         self._recorder.start()
         self._state = AppState.RECORDING
