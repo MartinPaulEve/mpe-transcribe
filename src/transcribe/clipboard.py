@@ -50,9 +50,24 @@ class Clipboard:
             ["xdotool", "keyup", "ctrl", "shift", "super", "alt"],
             check=False,
         )
-        time.sleep(0.05)
+        # Wait for X11 to fully process the keyup events before
+        # simulating Ctrl+V.  50 ms was not always enough — the
+        # physical hotkey modifiers could still be in-flight,
+        # causing only "v" to appear.
+        time.sleep(0.15)
+        # Use explicit keydown/keyup instead of "key ctrl+v" so
+        # the Ctrl state is unambiguous and not subject to X11
+        # modifier-map races.
         subprocess.run(
-            ["xdotool", "key", "ctrl+v"],
+            [
+                "xdotool",
+                "keydown",
+                "ctrl",
+                "key",
+                "v",
+                "keyup",
+                "ctrl",
+            ],
             check=True,
         )
         # Restore the previous clipboard contents.

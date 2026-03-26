@@ -98,17 +98,62 @@ class TestClipboard:
             cb = Clipboard()
             cb.paste_text("text")
             calls = mock_sub.run.call_args_list
-            # Find keyup and ctrl+v calls
-            keyup_call = [
-                c for c in calls if "xdotool" in c[0][0] and "keyup" in c[0][0]
-            ]
-            ctrlv_call = [
+            # Find ghost-modifier keyup call
+            ghost_keyup = [
                 c
                 for c in calls
-                if "xdotool" in c[0][0] and "ctrl+v" in c[0][0]
+                if c[0][0][0] == "xdotool"
+                and c[0][0][1] == "keyup"
+                and "ctrl" in c[0][0]
+                and "shift" in c[0][0]
             ]
-            assert len(keyup_call) == 1
-            assert len(ctrlv_call) == 1
+            # Find the paste call (keydown ctrl, key v, keyup ctrl)
+            paste_call = [
+                c
+                for c in calls
+                if c[0][0][0] == "xdotool" and "keydown" in c[0][0]
+            ]
+            assert len(ghost_keyup) == 1
+            assert len(paste_call) == 1
+
+    def test_paste_uses_explicit_keydown_keyup(self):
+        """Ctrl+V should use keydown/keyup to avoid race conditions."""
+        with patch("transcribe.clipboard.subprocess") as mock_sub:
+            mock_sub.run = _mock_subprocess_text().run
+            cb = Clipboard()
+            cb.paste_text("text")
+            calls = mock_sub.run.call_args_list
+            # Find the paste xdotool call
+            paste_calls = [
+                c
+                for c in calls
+                if c[0][0][0] == "xdotool" and "keydown" in c[0][0]
+            ]
+            assert len(paste_calls) == 1
+            cmd = paste_calls[0][0][0]
+            # Should use explicit keydown/key/keyup sequence
+            assert cmd == [
+                "xdotool",
+                "keydown",
+                "ctrl",
+                "key",
+                "v",
+                "keyup",
+                "ctrl",
+            ]
+
+    def test_ghost_modifier_release_delay(self):
+        """Delay after releasing ghost modifiers should be >= 100ms."""
+        with (
+            patch("transcribe.clipboard.subprocess") as mock_sub,
+            patch("transcribe.clipboard.time") as mock_time,
+        ):
+            mock_sub.run = _mock_subprocess_text().run
+            cb = Clipboard()
+            cb.paste_text("text")
+            sleep_calls = mock_time.sleep.call_args_list
+            # First sleep (after keyup, before paste) should be >= 0.1
+            assert sleep_calls[0][0][0] >= 0.1
 
     def test_unicode_text(self):
         with patch("transcribe.clipboard.subprocess") as mock_sub:
