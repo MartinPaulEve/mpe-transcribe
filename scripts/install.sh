@@ -2,20 +2,21 @@
 set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-VENV_BIN="${PROJECT_DIR}/.venv/bin"
-EXEC="${VENV_BIN}/transcribe"
+UV_BIN="$(command -v uv)"
 
 echo "==> Installing transcribe from ${PROJECT_DIR}"
 
-# Ensure venv and deps are up to date
-echo "==> Syncing dependencies..."
-(cd "$PROJECT_DIR" && uv sync)
-
-# Verify the entry point exists
-if [[ ! -x "$EXEC" ]]; then
-    echo "ERROR: ${EXEC} not found. Run 'uv sync' first." >&2
+if [[ -z "$UV_BIN" ]]; then
+    echo "ERROR: uv not found in PATH." >&2
     exit 1
 fi
+
+# Ensure venv and deps are up to date (including platform-specific extras)
+echo "==> Syncing dependencies..."
+(cd "$PROJECT_DIR" && uv sync --extra linux)
+
+# Build the ExecStart command: uv run with linux extras for platform deps
+EXEC="${UV_BIN} run --extra linux --project ${PROJECT_DIR} transcribe"
 
 # --- Desktop entry (launcher icon) ---
 DESKTOP_DIR="${HOME}/.local/share/applications"
@@ -40,8 +41,11 @@ echo "==> Desktop entry installed: ${DESKTOP_DIR}/transcribe.desktop"
 SERVICE_DIR="${HOME}/.config/systemd/user"
 mkdir -p "$SERVICE_DIR"
 
+UV_DIR="$(dirname "${UV_BIN}")"
 sed \
     -e "s|ExecStart=PLACEHOLDER|ExecStart=${EXEC}|" \
+    -e "s|WorkingDirectory=WORKDIR_PLACEHOLDER|WorkingDirectory=${PROJECT_DIR}|" \
+    -e "s|PATH_PLACEHOLDER|${UV_DIR}|" \
     "${PROJECT_DIR}/assets/transcribe.service" \
     > "${SERVICE_DIR}/transcribe.service"
 

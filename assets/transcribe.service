@@ -7,12 +7,14 @@ Requisite=graphical-session.target
 
 [Service]
 Type=simple
+WorkingDirectory=WORKDIR_PLACEHOLDER
 ExecStart=PLACEHOLDER
 Restart=on-failure
 RestartSec=5
 
 # Pass through display environment for X11/clipboard/notifications
 Environment=DISPLAY=:0
+Environment=PATH=PATH_PLACEHOLDER:/usr/local/bin:/usr/bin:/bin
 
 [Install]
 WantedBy=graphical-session.target
