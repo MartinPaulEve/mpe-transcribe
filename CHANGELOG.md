@@ -1,3 +1,10 @@
+## 1.5.1 (2026-03-26)
+
+### Fix
+
+- **clipboard**: prevent bare "v" paste on X11 due to modifier race
+- **service**: use uv run with --extra linux in systemd service
+
 ## 1.5.0 (2026-03-25)
 
 ### Feat
