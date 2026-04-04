@@ -53,6 +53,9 @@ class TestLoadConfig:
         config = load_config()
         assert "model" in config
         assert "hotkey" in config
+        assert config["replacements"] == {}
+        assert config["custom_terms"] == []
+        assert config["custom_terms_threshold"] == 0.8
 
     def test_defaults_are_correct(self):
         assert DEFAULT_MODEL == "nvidia/parakeet-tdt-0.6b-v3"

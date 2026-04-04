@@ -4,8 +4,13 @@ DEFAULT_MODEL = "mlx-community/whisper-large-v3-turbo"
 
 
 class MacOSTranscriber:
-    def __init__(self, model_name: str = DEFAULT_MODEL):
+    def __init__(
+        self,
+        model_name: str = DEFAULT_MODEL,
+        initial_prompt: str | None = None,
+    ):
         self._model_name = model_name
+        self._initial_prompt = initial_prompt
         self._model_loaded = False
 
     def load_model(self):
@@ -21,8 +26,8 @@ class MacOSTranscriber:
         # mlx_whisper accepts a numpy float32 array directly,
         # bypassing ffmpeg file decoding entirely.
         audio = np.asarray(audio, dtype=np.float32).flatten()
-        result = mlx_whisper.transcribe(
-            audio,
-            path_or_hf_repo=self._model_name,
-        )
+        kwargs = {"path_or_hf_repo": self._model_name}
+        if self._initial_prompt:
+            kwargs["initial_prompt"] = self._initial_prompt
+        result = mlx_whisper.transcribe(audio, **kwargs)
         return result.get("text", "").strip()

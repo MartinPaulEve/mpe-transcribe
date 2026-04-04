@@ -76,6 +76,26 @@ class TestMacOSTranscriber:
         result = t.transcribe(audio, 16000)
         assert result == ""
 
+    def test_initial_prompt_passed_to_transcribe(self):
+        t = MacOSTranscriber(initial_prompt="Martin Paul Eve, commit")
+        t.load_model()
+        self.mock_mlx.transcribe.return_value = {"text": "test"}
+        audio = np.zeros(16000, dtype=np.float32)
+        t.transcribe(audio, 16000)
+        call_kwargs = self.mock_mlx.transcribe.call_args[1]
+        assert call_kwargs["initial_prompt"] == (
+            "Martin Paul Eve, commit"
+        )
+
+    def test_no_initial_prompt_omits_kwarg(self):
+        t = MacOSTranscriber()
+        t.load_model()
+        self.mock_mlx.transcribe.return_value = {"text": "test"}
+        audio = np.zeros(16000, dtype=np.float32)
+        t.transcribe(audio, 16000)
+        call_kwargs = self.mock_mlx.transcribe.call_args[1]
+        assert "initial_prompt" not in call_kwargs
+
     def test_transcribe_flattens_multidim_audio(self):
         t = MacOSTranscriber()
         t.load_model()

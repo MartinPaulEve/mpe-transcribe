@@ -71,6 +71,20 @@ packages = ["src/transcribe"]
 # Default: "ctrl+shift+;" on Linux/Windows, "super+shift+'" on macOS (Cmd+Shift+')
 # hotkey = "ctrl+shift+;"
 
+# Voice recognition corrections — fix commonly misrecognized words.
+# Exact replacements (case-insensitive). The key is what the
+# transcriber produces; the value is what you actually meant.
+# [tool.transcribe.replacements]
+# comet = "commit"
+# "martin poll eve" = "Martin Paul Eve"
+
+# Fuzzy-matched terms — if the transcriber produces something
+# close to one of these terms, it will be corrected automatically.
+# Uses similarity matching, so minor misspellings are caught.
+# [tool.transcribe.custom_terms]
+# terms = ["Martin Paul Eve", "Birkbeck"]
+# threshold = 0.8
+
 [tool.ruff]
 line-length = 79
 

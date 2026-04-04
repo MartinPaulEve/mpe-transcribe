@@ -10,6 +10,9 @@ class TestApp:
     TEST_CONFIG = {
         "model": "nvidia/parakeet-tdt-0.6b-v3",
         "hotkey": "ctrl+shift+;",
+        "replacements": {},
+        "custom_terms": [],
+        "custom_terms_threshold": 0.8,
     }
 
     def _make_app(self):
@@ -198,3 +201,50 @@ class TestApp:
         app.toggle()
         assert app.state == AppState.RECORDING
         mock_rec.start.assert_called_once()
+
+    def test_corrections_applied_before_paste(self):
+        config = {
+            **self.TEST_CONFIG,
+            "replacements": {"comet": "commit"},
+            "custom_terms": [],
+            "custom_terms_threshold": 0.8,
+        }
+        mock_hk = MagicMock()
+        mock_cb = MagicMock()
+        mock_trans = MagicMock()
+        mock_notif = MagicMock()
+        with (
+            patch("transcribe.app.AudioRecorder") as mock_rec_cls,
+            patch(
+                "transcribe.app.create_transcriber",
+                return_value=mock_trans,
+            ),
+            patch(
+                "transcribe.app.create_hotkey_listener",
+                return_value=mock_hk,
+            ),
+            patch(
+                "transcribe.app.create_notifier",
+                return_value=mock_notif,
+            ),
+            patch(
+                "transcribe.app.create_clipboard",
+                return_value=mock_cb,
+            ),
+        ):
+            app = TranscribeApp(config=config)
+            mock_rec = mock_rec_cls.return_value
+            mock_rec.stop.return_value = np.ones(
+                16000, dtype=np.float32
+            )
+            mock_trans.transcribe.return_value = (
+                "push the comet to main"
+            )
+
+            app.toggle()
+            app.toggle()
+
+            time.sleep(0.1)
+            mock_cb.paste_text.assert_called_once_with(
+                "push the commit to main"
+            )

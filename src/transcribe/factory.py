@@ -53,13 +53,17 @@ def create_clipboard():
         return Clipboard()
 
 
-def create_transcriber(model_name: str):
+def create_transcriber(
+    model_name: str, initial_prompt: str | None = None
+):
     """Create a transcriber for the current session type."""
     session = detect_session()
     if session == "macos":
         from transcribe.macos_transcriber import MacOSTranscriber
 
-        return MacOSTranscriber(model_name=model_name)
+        return MacOSTranscriber(
+            model_name=model_name, initial_prompt=initial_prompt
+        )
     elif session == "windows":
         from transcribe.windows_transcriber import WindowsTranscriber
 

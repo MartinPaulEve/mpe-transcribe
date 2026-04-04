@@ -6,6 +6,7 @@ from enum import Enum
 import numpy as np
 
 from transcribe.config import load_config, parse_hotkey
+from transcribe.corrections import apply_corrections, build_whisper_prompt
 from transcribe.device_check import check_default_input_device
 from transcribe.factory import (
     create_clipboard,
@@ -40,7 +41,13 @@ class TranscribeApp:
         self._config = config or load_config()
         self._state = AppState.IDLE
         self._recorder = AudioRecorder()
-        self._transcriber = create_transcriber(self._config["model"])
+        prompt = build_whisper_prompt(
+            replacements=self._config.get("replacements"),
+            custom_terms=self._config.get("custom_terms"),
+        )
+        self._transcriber = create_transcriber(
+            self._config["model"], initial_prompt=prompt
+        )
         modifiers, key = parse_hotkey(self._config["hotkey"])
         self._hotkey = create_hotkey_listener(
             self.toggle, modifiers=modifiers, key=key
@@ -116,6 +123,15 @@ class TranscribeApp:
     def _do_transcribe(self, audio):
         try:
             text = self._transcriber.transcribe(audio, 16000)
+            if text:
+                text = apply_corrections(
+                    text,
+                    replacements=self._config.get("replacements"),
+                    custom_terms=self._config.get("custom_terms"),
+                    threshold=self._config.get(
+                        "custom_terms_threshold", 0.8
+                    ),
+                )
             if text:
                 self._clipboard.paste_text(text)
                 self._notifier.notify("Transcribe", "Pasted!")

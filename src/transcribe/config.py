@@ -26,13 +26,30 @@ def load_config() -> dict:
     model_default = _default_model()
     hotkey_default = _default_hotkey()
     if not pyproject.exists():
-        return {"model": model_default, "hotkey": hotkey_default}
+        return {
+            "model": model_default,
+            "hotkey": hotkey_default,
+            "replacements": {},
+            "custom_terms": [],
+            "custom_terms_threshold": 0.8,
+        }
     with open(pyproject, "rb") as f:
         data = tomllib.load(f)
     section = data.get("tool", {}).get("transcribe", {})
+    replacements = data.get("tool", {}).get(
+        "transcribe", {}
+    ).get("replacements", {})
+    custom_terms_section = data.get("tool", {}).get(
+        "transcribe", {}
+    ).get("custom_terms", {})
     return {
         "model": section.get("model", model_default),
         "hotkey": section.get("hotkey", hotkey_default),
+        "replacements": replacements,
+        "custom_terms": custom_terms_section.get("terms", []),
+        "custom_terms_threshold": custom_terms_section.get(
+            "threshold", 0.8
+        ),
     }
 
 
