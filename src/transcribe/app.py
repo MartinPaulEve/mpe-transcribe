@@ -129,9 +129,7 @@ class TranscribeApp:
                     text,
                     replacements=self._config.get("replacements"),
                     custom_terms=self._config.get("custom_terms"),
-                    threshold=self._config.get(
-                        "custom_terms_threshold", 0.8
-                    ),
+                    threshold=self._config.get("custom_terms_threshold", 0.8),
                 )
                 if text != original:
                     logger.info(

@@ -36,20 +36,18 @@ def load_config() -> dict:
     with open(pyproject, "rb") as f:
         data = tomllib.load(f)
     section = data.get("tool", {}).get("transcribe", {})
-    replacements = data.get("tool", {}).get(
-        "transcribe", {}
-    ).get("replacements", {})
-    custom_terms_section = data.get("tool", {}).get(
-        "transcribe", {}
-    ).get("custom_terms", {})
+    replacements = (
+        data.get("tool", {}).get("transcribe", {}).get("replacements", {})
+    )
+    custom_terms_section = (
+        data.get("tool", {}).get("transcribe", {}).get("custom_terms", {})
+    )
     return {
         "model": section.get("model", model_default),
         "hotkey": section.get("hotkey", hotkey_default),
         "replacements": replacements,
         "custom_terms": custom_terms_section.get("terms", []),
-        "custom_terms_threshold": custom_terms_section.get(
-            "threshold", 0.8
-        ),
+        "custom_terms_threshold": custom_terms_section.get("threshold", 0.8),
     }
 
 

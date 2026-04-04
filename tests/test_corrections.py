@@ -7,16 +7,12 @@ from transcribe.corrections import (
 class TestExactReplacements:
     def test_simple_word_replacement(self):
         text = "push the comet to main"
-        result = apply_corrections(
-            text, replacements={"comet": "commit"}
-        )
+        result = apply_corrections(text, replacements={"comet": "commit"})
         assert result == "push the commit to main"
 
     def test_case_insensitive(self):
         text = "Push the Comet to main"
-        result = apply_corrections(
-            text, replacements={"comet": "commit"}
-        )
+        result = apply_corrections(text, replacements={"comet": "commit"})
         assert result == "Push the commit to main"
 
     def test_multi_word_replacement(self):
@@ -29,9 +25,7 @@ class TestExactReplacements:
 
     def test_no_match_leaves_text_unchanged(self):
         text = "nothing to change here"
-        result = apply_corrections(
-            text, replacements={"comet": "commit"}
-        )
+        result = apply_corrections(text, replacements={"comet": "commit"})
         assert result == "nothing to change here"
 
     def test_multiple_replacements(self):
@@ -132,9 +126,7 @@ class TestCombined:
 
 class TestBuildWhisperPrompt:
     def test_builds_from_replacements(self):
-        prompt = build_whisper_prompt(
-            replacements={"comet": "commit"}
-        )
+        prompt = build_whisper_prompt(replacements={"comet": "commit"})
         assert prompt == "commit"
 
     def test_builds_from_custom_terms(self):
@@ -153,7 +145,4 @@ class TestBuildWhisperPrompt:
     def test_empty_returns_none(self):
         assert build_whisper_prompt() is None
         assert build_whisper_prompt(replacements={}) is None
-        assert (
-            build_whisper_prompt(replacements={}, custom_terms=[])
-            is None
-        )
+        assert build_whisper_prompt(replacements={}, custom_terms=[]) is None

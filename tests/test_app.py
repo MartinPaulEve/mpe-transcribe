@@ -234,12 +234,8 @@ class TestApp:
         ):
             app = TranscribeApp(config=config)
             mock_rec = mock_rec_cls.return_value
-            mock_rec.stop.return_value = np.ones(
-                16000, dtype=np.float32
-            )
-            mock_trans.transcribe.return_value = (
-                "push the comet to main"
-            )
+            mock_rec.stop.return_value = np.ones(16000, dtype=np.float32)
+            mock_trans.transcribe.return_value = "push the comet to main"
 
             app.toggle()
             app.toggle()

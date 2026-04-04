@@ -31,9 +31,7 @@ def _exact_replace(text: str, old: str, new: str) -> str:
     return pattern.sub(new, text)
 
 
-def _fuzzy_replace(
-    text: str, term: str, threshold: float
-) -> str:
+def _fuzzy_replace(text: str, term: str, threshold: float) -> str:
     term_words = term.split()
     n = len(term_words)
     if n == 0:
@@ -41,9 +39,7 @@ def _fuzzy_replace(
     words = text.split()
     if len(words) < n:
         # Check the entire text as one span
-        ratio = SequenceMatcher(
-            None, text.lower(), term.lower()
-        ).ratio()
+        ratio = SequenceMatcher(None, text.lower(), term.lower()).ratio()
         if ratio >= threshold:
             return term
         return text
@@ -52,9 +48,7 @@ def _fuzzy_replace(
     best_start = -1
     for i in range(len(words) - n + 1):
         span = " ".join(words[i : i + n])
-        ratio = SequenceMatcher(
-            None, span.lower(), term.lower()
-        ).ratio()
+        ratio = SequenceMatcher(None, span.lower(), term.lower()).ratio()
         if ratio > best_ratio:
             best_ratio = ratio
             best_start = i

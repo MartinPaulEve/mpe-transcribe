@@ -83,9 +83,7 @@ class TestMacOSTranscriber:
         audio = np.zeros(16000, dtype=np.float32)
         t.transcribe(audio, 16000)
         call_kwargs = self.mock_mlx.transcribe.call_args[1]
-        assert call_kwargs["initial_prompt"] == (
-            "Martin Paul Eve, commit"
-        )
+        assert call_kwargs["initial_prompt"] == ("Martin Paul Eve, commit")
 
     def test_no_initial_prompt_omits_kwarg(self):
         t = MacOSTranscriber()
