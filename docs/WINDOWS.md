@@ -74,6 +74,10 @@ model = "nvidia/parakeet-tdt-0.6b-v3"   # default; or "nvidia/parakeet-rnnt-1.1b
 hotkey = "ctrl+shift+;"                  # default
 ```
 
+## Voice recognition corrections
+
+If the transcriber consistently gets certain words wrong, you can define corrections in `pyproject.toml`. See the [Configuration section in the README](../README.md#voice-recognition-corrections) for full details.
+
 ## Model choices
 
 | Model | VRAM | Speed | Accuracy |

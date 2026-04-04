@@ -30,6 +30,40 @@ Edit the `[tool.transcribe]` section in `pyproject.toml`:
 
 The app automatically selects the appropriate model and hotkey for your platform. Override in `pyproject.toml` only if you want a non-default choice.
 
+### Voice recognition corrections
+
+If the transcriber consistently misrecognises certain words or names, you can define corrections in `pyproject.toml`. Two types are supported:
+
+#### Exact replacements
+
+Case-insensitive find-and-replace applied to every transcription. The key is what the transcriber produces; the value is what you actually meant:
+
+```toml
+[tool.transcribe.replacements]
+comet = "commit"
+"martin poll eve" = "Martin Paul Eve"
+```
+
+#### Fuzzy term matching
+
+For names and phrases that get transcribed in unpredictably wrong ways, fuzzy matching uses similarity scoring to catch close misspellings automatically:
+
+```toml
+[tool.transcribe.custom_terms]
+terms = ["Martin Paul Eve", "Birkbeck"]
+threshold = 0.8   # optional, default 0.8 (0.0–1.0)
+```
+
+The `threshold` controls how similar a span of text must be to the target term before it is corrected. Lower values are more aggressive (more corrections, more false positives); higher values are stricter. The default of `0.8` works well for typical name misspellings.
+
+Both correction types can be used together. Exact replacements run first, then fuzzy matching. On macOS, custom terms are also passed to Whisper as an `initial_prompt`, which biases the model toward recognising them correctly at transcription time — before post-processing even kicks in.
+
+When a correction is applied, it is logged at INFO level:
+
+```
+Corrections applied: 'push the comet to main' -> 'push the commit to main'
+```
+
 ### Hotkey format
 
 The hotkey string uses `+`-separated modifier and key names:
@@ -110,6 +144,7 @@ IDLE ──[hotkey]──> RECORDING ──[hotkey]──> TRANSCRIBING ──[d
 | `session.py` | Detects macOS vs Windows vs X11 vs Wayland session |
 | `factory.py` | Creates the correct backend for the session (hotkey, clipboard, transcriber, notifier) |
 | `config.py` | Reads `[tool.transcribe]` from pyproject.toml, platform-aware defaults |
+| `corrections.py` | Post-transcription text corrections: exact replacements and fuzzy term matching |
 | `recorder.py` | 16 kHz mono audio capture via PortAudio |
 | `transcriber.py` | Linux: NeMo Parakeet model inference |
 | `macos_transcriber.py` | macOS: mlx-whisper model inference |

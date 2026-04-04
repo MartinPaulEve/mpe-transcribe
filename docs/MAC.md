@@ -161,6 +161,12 @@ After changing the hotkey, reinstall (the hotkey is compiled into the launcher):
 ./scripts/install_macos.sh
 ```
 
+### Voice recognition corrections
+
+If the transcriber consistently gets certain words wrong, you can define corrections in `pyproject.toml`. See the [Configuration section in the README](../README.md#voice-recognition-corrections) for full details.
+
+On macOS, custom terms are additionally passed to Whisper as an `initial_prompt`, which biases the model toward recognising them correctly at the transcription stage itself — giving you two layers of correction (model-level + post-processing).
+
 ### Changing the model
 
 Edit `pyproject.toml`:

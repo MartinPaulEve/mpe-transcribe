@@ -120,6 +120,10 @@ journalctl --user -u transcribe -f   # follow logs
 
 Press **Ctrl+C** to quit (when running directly).
 
+## Voice recognition corrections
+
+If the transcriber consistently gets certain words wrong, you can define corrections in `pyproject.toml`. See the [Configuration section in the README](../README.md#voice-recognition-corrections) for full details.
+
 ## Available models
 
 | Model | Size | Speed | Accuracy | VRAM |
