@@ -1,3 +1,10 @@
+## 1.6.0 (2026-04-04)
+
+### Feat
+
+- **corrections**: log when corrections are applied to transcription
+- **corrections**: add voice recognition custom terms correction
+
 ## 1.5.1 (2026-03-26)
 
 ### Fix
