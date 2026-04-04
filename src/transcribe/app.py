@@ -124,6 +124,7 @@ class TranscribeApp:
         try:
             text = self._transcriber.transcribe(audio, 16000)
             if text:
+                original = text
                 text = apply_corrections(
                     text,
                     replacements=self._config.get("replacements"),
@@ -132,6 +133,12 @@ class TranscribeApp:
                         "custom_terms_threshold", 0.8
                     ),
                 )
+                if text != original:
+                    logger.info(
+                        "Corrections applied: %r -> %r",
+                        original,
+                        text,
+                    )
             if text:
                 self._clipboard.paste_text(text)
                 self._notifier.notify("Transcribe", "Pasted!")
