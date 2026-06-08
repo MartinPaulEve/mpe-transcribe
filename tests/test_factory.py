@@ -78,6 +78,34 @@ class TestFactory:
         assert isinstance(t, MacOSTranscriber)
 
     @patch("transcribe.factory.detect_session", return_value="x11")
+    def test_create_transcriber_canary_linux(self, mock_detect):
+        from transcribe.transcriber import Transcriber
+
+        t = create_transcriber("nvidia/canary-1b-v2")
+        assert isinstance(t, Transcriber)
+
+    @patch("transcribe.factory.detect_session", return_value="x11")
+    def test_create_transcriber_canary_requests_english(self, mock_detect):
+        import sys
+
+        import numpy as np
+
+        mock_asr = sys.modules["nemo.collections.asr"]
+        mock_asr.reset_mock()
+        mock_model = MagicMock()
+        mock_model.transcribe.return_value = ["bonjour"]
+        mock_asr.models.ASRModel.from_pretrained.return_value = mock_model
+
+        t = create_transcriber("nvidia/canary-1b-v2")
+        t.load_model()
+        t.transcribe(np.zeros(16000, dtype=np.float32), 16000)
+
+        assert mock_model.transcribe.call_args.kwargs == {
+            "source_lang": "en",
+            "target_lang": "en",
+        }
+
+    @patch("transcribe.factory.detect_session", return_value="x11")
     def test_create_notifier_linux(self, mock_detect):
         from transcribe.notifier import AppNotifier
 

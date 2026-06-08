@@ -49,8 +49,14 @@ packages = ["src/transcribe"]
 
 [tool.transcribe]
 # Linux model choices (requires NVIDIA GPU with CUDA):
-#   "nvidia/parakeet-tdt-0.6b-v3"   - fast, lightweight (~2GB VRAM, default on Linux)
+#   "nvidia/parakeet-tdt-0.6b-v3"   - fast, lightweight (~2GB VRAM, default on Linux).
+#                                     Transducer model: strictly verbatim, never paraphrases.
 #   "nvidia/parakeet-rnnt-1.1b"     - slower, higher accuracy (~4GB VRAM)
+#   "nvidia/canary-1b-v2"           - higher accuracy, punctuated, still faithful (it is an
+#                                     encoder-decoder, not a generative LLM). Slower and larger
+#                                     (~4GB VRAM) than Parakeet. Note: numbers render as digits
+#                                     (e.g. "10" not "ten") because inverse text normalization
+#                                     is off by default.
 #
 # macOS model choices (Apple Silicon M1/M2/M3/M4, uses Metal via MLX):
 #   "mlx-community/whisper-large-v3-turbo" - best accuracy/speed (~1.4GB, default on macOS)

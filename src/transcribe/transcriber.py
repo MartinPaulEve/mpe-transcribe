@@ -10,8 +10,17 @@ DEFAULT_MODEL = "nvidia/parakeet-tdt-0.6b-v3"
 
 
 class Transcriber:
-    def __init__(self, model_name: str = DEFAULT_MODEL):
+    def __init__(
+        self,
+        model_name: str = DEFAULT_MODEL,
+        transcribe_kwargs: dict | None = None,
+        initial_prompt: str | None = None,
+    ):
         self._model_name = model_name
+        self._transcribe_kwargs = transcribe_kwargs or {}
+        # NeMo models do not consume an initial_prompt; accepted only
+        # so every backend shares one construction signature.
+        self._initial_prompt = initial_prompt
         self._model = None
 
     def load_model(self):
@@ -26,7 +35,9 @@ class Transcriber:
             tmp_path = f.name
             sf.write(f, audio, sample_rate)
         try:
-            result = self._model.transcribe([tmp_path])
+            result = self._model.transcribe(
+                [tmp_path], **self._transcribe_kwargs
+            )
             hypothesis = result[0]
             if isinstance(hypothesis, str):
                 return hypothesis

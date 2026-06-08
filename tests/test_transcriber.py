@@ -50,5 +50,21 @@ class TestTranscriber:
         with pytest.raises(RuntimeError, match="model not loaded"):
             t.transcribe(np.zeros(100, dtype=np.float32), 16000)
 
+    def test_transcribe_forwards_transcribe_kwargs(self):
+        t = Transcriber(
+            transcribe_kwargs={"source_lang": "en", "target_lang": "en"}
+        )
+        mock_model = MagicMock()
+        mock_model.transcribe.return_value = ["hola"]
+        self.mock_asr.models.ASRModel.from_pretrained.return_value = mock_model
+        t.load_model()
+
+        result = t.transcribe(np.zeros(16000, dtype=np.float32), 16000)
+        assert result == "hola"
+        assert mock_model.transcribe.call_args.kwargs == {
+            "source_lang": "en",
+            "target_lang": "en",
+        }
+
     def test_sets_torch_env_var(self):
         assert os.environ.get("TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD") == "1"
