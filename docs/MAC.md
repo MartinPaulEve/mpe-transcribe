@@ -44,6 +44,10 @@ launchctl stop com.mpe.transcribe && launchctl start com.mpe.transcribe
 
 The first run will download the Whisper model (~1.4 GB) from Hugging Face. Subsequent runs use the cached model at `~/.cache/huggingface/`.
 
+### Using this Mac as a transcription host
+
+The Mac can also serve networked **clients** (e.g. a Linux VM in Parallels): the client's hotkey triggers a recording on the Mac's mic, the Mac transcribes, and the text is pasted back in the client. Set `mode = "host"` under `[tool.transcribe.network]` in `pyproject.toml` (or run `uv run transcribe --host`) and share a key generated with `uv run transcribe keygen`. See [NETWORK.md](NETWORK.md).
+
 ## Permissions
 
 macOS requires two permissions for Transcribe to function. Both are granted to **Transcribe.app** (not to a Python binary), so they persist across reboots and reinstalls (unless the code signature changes).

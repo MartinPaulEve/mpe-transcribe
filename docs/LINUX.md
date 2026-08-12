@@ -94,6 +94,10 @@ To uninstall:
 ./scripts/uninstall.sh
 ```
 
+### Using this machine as a network client (no GPU needed)
+
+If this machine has no NVIDIA GPU (e.g. it is a Linux VM on an Apple Silicon Mac), it can run as a lightweight **client**: the hotkey and paste happen here, while a networked host records and transcribes. Skip the full install above and instead run `uv sync --extra client-linux` and `./scripts/install_client.sh` — no model, GPU, or `libportaudio2` required (the paste/notify packages `xclip`/`xdotool`/`libnotify-bin` are still needed). See [NETWORK.md](NETWORK.md).
+
 ## Usage
 
 ### Running directly

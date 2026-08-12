@@ -11,6 +11,17 @@ Supports **Linux** (X11/Wayland with NVIDIA Parakeet), **macOS** (Apple Silicon 
 - **[Linux](docs/LINUX.md)** — X11/Wayland, NVIDIA GPU, systemd service
 - **[macOS](docs/MAC.md)** — Apple Silicon, launchd service
 - **[Windows](docs/WINDOWS.md)** — NVIDIA GPU, manual launch
+- **[Networked mode](docs/NETWORK.md)** — host + client split over the LAN
+
+---
+
+## Networked mode (host + client)
+
+The app can be split across the network: a **host** (e.g. an Apple Silicon Mac) records and transcribes, while a **client** (e.g. a Linux VM in Parallels, which has no usable GPU) triggers transcriptions with its hotkey and pastes the text locally. The host's microphone is used, so no audio crosses the network — traffic is encrypted and authenticated UDP protected by a pre-shared key.
+
+Generate a shared key with `uv run transcribe keygen`, set `mode = "host"` / `mode = "client"` under `[tool.transcribe.network]` in `pyproject.toml` (or use the `--host` / `--client` flags), and install a lightweight client-only service with `./scripts/install_client.sh` — clients need none of the model/GPU/audio stack (`uv sync --extra client-linux` or `--extra client-macos`). Full-stack installs keep using the `linux`, `macos`, and `windows` extras as before.
+
+See **[docs/NETWORK.md](docs/NETWORK.md)** for the full guide: configuration reference, security model, protocol, and troubleshooting.
 
 ---
 
@@ -140,10 +151,10 @@ IDLE ──[hotkey]──> RECORDING ──[hotkey]──> TRANSCRIBING ──[d
 | Module | Responsibility |
 |---|---|
 | `__main__.py` | Allows running the package with `python -m transcribe` |
-| `app.py` | State machine orchestrator |
+| `app.py` | State machine orchestrator; dispatches standalone/host/client modes |
 | `session.py` | Detects macOS vs Windows vs X11 vs Wayland session |
 | `factory.py` | Creates the correct backend for the session (hotkey, clipboard, transcriber, notifier) |
-| `config.py` | Reads `[tool.transcribe]` from pyproject.toml, platform-aware defaults |
+| `config.py` | Reads `[tool.transcribe]` (and `[tool.transcribe.network]`) from pyproject.toml, platform-aware defaults, pre-shared key resolution |
 | `corrections.py` | Post-transcription text corrections: exact replacements and fuzzy term matching |
 | `recorder.py` | 16 kHz mono audio capture via PortAudio |
 | `transcriber.py` | Linux: NeMo Parakeet model inference |
@@ -163,6 +174,11 @@ IDLE ──[hotkey]──> RECORDING ──[hotkey]──> TRANSCRIBING ──[d
 | `windows_notifier.py` | Windows: toast notifications via PowerShell + audible ding |
 | `windows_clipboard.py` | Windows: clipboard via Win32 API (ctypes), paste via SendInput |
 | `macos_permissions.py` | macOS: checks accessibility and microphone TCC permissions |
+| `net/protocol.py` | Networked mode: MPET wire protocol framing, bodies, chunking |
+| `net/crypto.py` | Networked mode: ChaCha20-Poly1305 AEAD, key handling, replay guard |
+| `net/host.py` | Networked mode: UDP host — subscriber registry, session control, reliable TEXT delivery |
+| `net/client.py` | Networked mode: UDP client — trigger, register/renew, verify + reassemble + paste |
+| `net/transport.py` | Networked mode: the thin UDP socket layer behind a testable seam |
 | `scripts/transcribe_launcher.c` | Native Mach-O launcher for Transcribe.app; registers a Carbon global hotkey and sends SIGUSR1 to the Python child process, compiled at install time by `install_macos.sh` |
 
 ## Tested on
