@@ -301,7 +301,7 @@ class TestClientApp:
 
 
 class TestMainDispatch:
-    def _run_main(self, mode):
+    def _run_main(self, mode, argv=None):
         config = make_config(mode)
         with (
             patch("transcribe.app.load_config", return_value=config),
@@ -309,7 +309,7 @@ class TestMainDispatch:
             patch("transcribe.app.HostApp") as host_cls,
             patch("transcribe.app.ClientApp") as client_cls,
         ):
-            main()
+            main(argv or [])
         return standalone_cls, host_cls, client_cls
 
     def test_standalone_is_default(self):
@@ -330,3 +330,70 @@ class TestMainDispatch:
         client_cls.assert_called_once()
         client_cls.return_value.run.assert_called_once()
         standalone_cls.assert_not_called()
+
+
+class TestCli:
+    def test_keygen_prints_fresh_base64_key(self, capsys):
+        with patch("transcribe.app.load_config") as mock_load:
+            main(["keygen"])
+            mock_load.assert_not_called()
+        printed = capsys.readouterr().out.strip()
+        assert len(base64.b64decode(printed, validate=True)) == 32
+
+    def test_keygen_keys_are_unique(self, capsys):
+        main(["keygen"])
+        first = capsys.readouterr().out.strip()
+        main(["keygen"])
+        second = capsys.readouterr().out.strip()
+        assert first != second
+
+    def test_client_flag_overrides_config_mode(self):
+        config = make_config("standalone")
+        with (
+            patch("transcribe.app.load_config", return_value=config),
+            patch("transcribe.app.TranscribeApp") as standalone_cls,
+            patch("transcribe.app.ClientApp") as client_cls,
+        ):
+            main(["--client"])
+        client_cls.assert_called_once()
+        standalone_cls.assert_not_called()
+
+    def test_standalone_flag_overrides_config_mode(self):
+        config = make_config("client")
+        with (
+            patch("transcribe.app.load_config", return_value=config),
+            patch("transcribe.app.TranscribeApp") as standalone_cls,
+            patch("transcribe.app.ClientApp") as client_cls,
+        ):
+            main(["--standalone"])
+        standalone_cls.assert_called_once()
+        client_cls.assert_not_called()
+
+    def test_host_flag_overrides_config_mode(self):
+        config = make_config("standalone")
+        with (
+            patch("transcribe.app.load_config", return_value=config),
+            patch("transcribe.app.TranscribeApp") as standalone_cls,
+            patch("transcribe.app.HostApp") as host_cls,
+        ):
+            main(["--host"])
+        host_cls.assert_called_once()
+        standalone_cls.assert_not_called()
+
+    def test_server_flags_override_network_config(self):
+        config = make_config("client")
+        with (
+            patch("transcribe.app.load_config", return_value=config),
+            patch("transcribe.app.ClientApp") as client_cls,
+        ):
+            main(
+                [
+                    "--server-host",
+                    "192.168.1.9",
+                    "--server-port",
+                    "48123",
+                ]
+            )
+        passed = client_cls.call_args[0][0]
+        assert passed["network"]["server_host"] == "192.168.1.9"
+        assert passed["network"]["server_port"] == 48123

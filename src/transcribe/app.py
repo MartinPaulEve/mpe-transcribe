@@ -1,3 +1,4 @@
+import argparse
 import logging
 import signal
 import threading
@@ -470,9 +471,60 @@ class ClientApp:
         logger.info("Shutdown complete")
 
 
-def main():
+def _parse_args(argv=None):
+    parser = argparse.ArgumentParser(
+        prog="transcribe",
+        description="Voice transcription with a global hotkey.",
+    )
+    parser.add_argument(
+        "command",
+        nargs="?",
+        choices=["keygen"],
+        help="keygen: print a fresh base64 pre-shared key",
+    )
+    mode_group = parser.add_mutually_exclusive_group()
+    mode_group.add_argument(
+        "--standalone",
+        action="store_true",
+        help="record, transcribe, and paste locally (default)",
+    )
+    mode_group.add_argument(
+        "--host",
+        action="store_true",
+        help="record + transcribe here, serve clients over UDP",
+    )
+    mode_group.add_argument(
+        "--client",
+        action="store_true",
+        help="hotkey + paste only; a remote host transcribes",
+    )
+    parser.add_argument("--server-host", help="host address (client mode)")
+    parser.add_argument(
+        "--server-port", type=int, help="host UDP port (client mode)"
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv=None):
+    args = _parse_args(argv)
+    if args.command == "keygen":
+        from transcribe.net import crypto
+
+        print(crypto.encode_key(crypto.generate_key()))
+        return
     config = load_config()
-    mode = config["network"]["mode"]
+    network = config["network"]
+    if args.host:
+        network["mode"] = "host"
+    elif args.client:
+        network["mode"] = "client"
+    elif args.standalone:
+        network["mode"] = "standalone"
+    if args.server_host:
+        network["server_host"] = args.server_host
+    if args.server_port:
+        network["server_port"] = args.server_port
+    mode = network["mode"]
     if mode == "host":
         app = HostApp(config)
     elif mode == "client":
