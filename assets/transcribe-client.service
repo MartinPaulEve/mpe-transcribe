@@ -1,0 +1,23 @@
+[Unit]
+Description=Voice Transcription Client (network trigger + paste)
+Documentation=https://github.com/martin/transcribe
+After=graphical-session.target network-online.target
+PartOf=graphical-session.target
+Requisite=graphical-session.target
+
+[Service]
+Type=simple
+WorkingDirectory=WORKDIR_PLACEHOLDER
+ExecStart=PLACEHOLDER
+Restart=on-failure
+RestartSec=5
+
+# Pass through display environment for X11/clipboard/notifications
+Environment=DISPLAY=:0
+Environment=PATH=PATH_PLACEHOLDER:/usr/local/bin:/usr/bin:/bin
+# Pre-shared key: put TRANSCRIBE_PSK=<base64 key> in this file
+# (chmod 600). Generate a key with `transcribe keygen`.
+EnvironmentFile=-%h/.config/transcribe/env
+
+[Install]
+WantedBy=graphical-session.target

@@ -5,25 +5,42 @@ description = "Voice transcription app with global hotkey — supports Linux, ma
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "sounddevice",
-    "soundfile",
-    "numpy",
-    "scipy",
     "cryptography>=50.0.0",
 ]
 
 [project.optional-dependencies]
+# Full (standalone/host) installs: audio capture + transcription.
 linux = [
+    "sounddevice",
+    "soundfile",
+    "numpy",
+    "scipy",
     "nemo_toolkit[asr]",
     "python-xlib",
     "evdev",
 ]
 macos = [
+    "sounddevice",
+    "soundfile",
+    "numpy",
+    "scipy",
     "mlx-whisper",
     "pynput",
 ]
 windows = [
+    "sounddevice",
+    "soundfile",
+    "numpy",
+    "scipy",
     "nemo_toolkit[asr]",
+    "pynput",
+]
+# Client-only installs: hotkey + paste, no audio stack, no GPU.
+client-linux = [
+    "python-xlib",
+    "evdev",
+]
+client-macos = [
     "pynput",
 ]
 
@@ -98,4 +115,5 @@ dev = [
     "pytest-mock",
     "ruff",
     "pre-commit",
+    "numpy",
 ]

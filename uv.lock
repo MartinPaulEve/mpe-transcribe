@@ -4437,29 +4437,45 @@ version = "1.6.0"
 source = { editable = "." }
 dependencies = [
     { name = "cryptography" },
+]
+
+[package.optional-dependencies]
+client-linux = [
+    { name = "evdev" },
+    { name = "python-xlib" },
+]
+client-macos = [
+    { name = "pynput" },
+]
+linux = [
+    { name = "evdev" },
+    { name = "nemo-toolkit", extra = ["asr"] },
     { name = "numpy" },
+    { name = "python-xlib" },
+    { name = "scipy" },
+    { name = "sounddevice" },
+    { name = "soundfile" },
+]
+macos = [
+    { name = "mlx-whisper" },
+    { name = "numpy" },
+    { name = "pynput" },
+    { name = "scipy" },
+    { name = "sounddevice" },
+    { name = "soundfile" },
+]
+windows = [
+    { name = "nemo-toolkit", extra = ["asr"] },
+    { name = "numpy" },
+    { name = "pynput" },
     { name = "scipy" },
     { name = "sounddevice" },
     { name = "soundfile" },
 ]
 
-[package.optional-dependencies]
-linux = [
-    { name = "evdev" },
-    { name = "nemo-toolkit", extra = ["asr"] },
-    { name = "python-xlib" },
-]
-macos = [
-    { name = "mlx-whisper" },
-    { name = "pynput" },
-]
-windows = [
-    { name = "nemo-toolkit", extra = ["asr"] },
-    { name = "pynput" },
-]
-
 [package.dev-dependencies]
 dev = [
+    { name = "numpy" },
     { name = "pre-commit" },
     { name = "pytest" },
     { name = "pytest-mock" },
@@ -4469,22 +4485,34 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "cryptography", specifier = ">=50.0.0" },
+    { name = "evdev", marker = "extra == 'client-linux'" },
     { name = "evdev", marker = "extra == 'linux'" },
     { name = "mlx-whisper", marker = "extra == 'macos'" },
     { name = "nemo-toolkit", extras = ["asr"], marker = "extra == 'linux'" },
     { name = "nemo-toolkit", extras = ["asr"], marker = "extra == 'windows'" },
-    { name = "numpy" },
+    { name = "numpy", marker = "extra == 'linux'" },
+    { name = "numpy", marker = "extra == 'macos'" },
+    { name = "numpy", marker = "extra == 'windows'" },
+    { name = "pynput", marker = "extra == 'client-macos'" },
     { name = "pynput", marker = "extra == 'macos'" },
     { name = "pynput", marker = "extra == 'windows'" },
+    { name = "python-xlib", marker = "extra == 'client-linux'" },
     { name = "python-xlib", marker = "extra == 'linux'" },
-    { name = "scipy" },
-    { name = "sounddevice" },
-    { name = "soundfile" },
+    { name = "scipy", marker = "extra == 'linux'" },
+    { name = "scipy", marker = "extra == 'macos'" },
+    { name = "scipy", marker = "extra == 'windows'" },
+    { name = "sounddevice", marker = "extra == 'linux'" },
+    { name = "sounddevice", marker = "extra == 'macos'" },
+    { name = "sounddevice", marker = "extra == 'windows'" },
+    { name = "soundfile", marker = "extra == 'linux'" },
+    { name = "soundfile", marker = "extra == 'macos'" },
+    { name = "soundfile", marker = "extra == 'windows'" },
 ]
-provides-extras = ["linux", "macos", "windows"]
+provides-extras = ["linux", "macos", "windows", "client-linux", "client-macos"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "numpy" },
     { name = "pre-commit" },
     { name = "pytest" },
     { name = "pytest-mock" },
