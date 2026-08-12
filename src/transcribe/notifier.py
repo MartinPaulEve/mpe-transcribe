@@ -1,14 +1,17 @@
 import subprocess
 
-import numpy as np
-import sounddevice as sd
-
 
 class AppNotifier:
     def notify(self, title: str, body: str):
         subprocess.run(["notify-send", title, body], check=False)
 
     def ding(self):
+        # Lazy import: client-mode installs have no sounddevice.
+        try:
+            import numpy as np
+            import sounddevice as sd
+        except ImportError:
+            return
         duration = 0.15
         sample_rate = 44100
         t = np.linspace(

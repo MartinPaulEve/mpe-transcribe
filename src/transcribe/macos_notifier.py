@@ -1,8 +1,5 @@
 import subprocess
 
-import numpy as np
-import sounddevice as sd
-
 
 class MacOSNotifier:
     def notify(self, title: str, body: str):
@@ -19,6 +16,12 @@ class MacOSNotifier:
             pass
 
     def ding(self):
+        # Lazy import: client-mode installs have no sounddevice.
+        try:
+            import numpy as np
+            import sounddevice as sd
+        except ImportError:
+            return
         duration = 0.15
         sample_rate = 44100
         t = np.linspace(

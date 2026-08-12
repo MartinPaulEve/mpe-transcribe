@@ -21,7 +21,7 @@ class TestApp:
         mock_trans = MagicMock()
         mock_notif = MagicMock()
         with (
-            patch("transcribe.app.AudioRecorder") as mock_rec_cls,
+            patch("transcribe.recorder.AudioRecorder") as mock_rec_cls,
             patch(
                 "transcribe.app.create_transcriber",
                 return_value=mock_trans,
@@ -214,7 +214,7 @@ class TestApp:
         mock_trans = MagicMock()
         mock_notif = MagicMock()
         with (
-            patch("transcribe.app.AudioRecorder") as mock_rec_cls,
+            patch("transcribe.recorder.AudioRecorder") as mock_rec_cls,
             patch(
                 "transcribe.app.create_transcriber",
                 return_value=mock_trans,

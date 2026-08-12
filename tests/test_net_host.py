@@ -418,6 +418,92 @@ class TestPublishState:
         assert host.state == "recording"
 
 
+class TestLocalTrigger:
+    def test_local_start_records_and_broadcasts(self):
+        host, transport, clock, on_start, _ = make_host()
+        register(host, clock, CLIENT_A, "vm")
+        assert host.local_start() is True
+        assert host.state == "recording"
+        assert host.initiator == "host"
+        assert host.initiator_addr is None
+        on_start.assert_called_once()
+        states = sent_of_type(transport, protocol.TYPE_STATE, CLIENT_A)
+        assert states[-1][0]["state"] == "recording"
+
+    def test_local_start_while_busy_is_refused(self):
+        host, _, clock, on_start, _ = make_host()
+        register(host, clock, CLIENT_A, "vm")
+        send_start(host, clock, CLIENT_A, "vm", "sess1")
+        assert host.local_start() is False
+        assert host.session == "sess1"
+        assert on_start.call_count == 1
+
+    def test_local_stop_transcribes(self):
+        host, _, clock, _, on_stop = make_host()
+        host.local_start()
+        assert host.local_stop() is True
+        assert host.state == "transcribing"
+        on_stop.assert_called_once()
+
+    def test_local_stop_when_idle_is_refused(self):
+        host, _, _, _, on_stop = make_host()
+        assert host.local_stop() is False
+        on_stop.assert_not_called()
+
+    def test_local_session_text_is_not_networked(self):
+        host, transport, clock, _, _ = make_host()
+        register(host, clock, CLIENT_A, "vm")
+        host.local_start()
+        host.local_stop()
+        transport.sent.clear()
+        host.publish_text("local dictation")
+        assert sent_of_type(transport, protocol.TYPE_TEXT) == []
+
+    def test_remote_initiator_addr_exposed(self):
+        host, _, clock, _, _ = make_host()
+        register(host, clock, CLIENT_A, "vm")
+        send_start(host, clock, CLIENT_A, "vm", "sess1")
+        assert host.initiator_addr == CLIENT_A
+
+
+class TestOnStartFailure:
+    def test_failing_on_start_aborts_remote_session(self):
+        clock = FakeClock()
+        transport = FakeTransport()
+        on_start = MagicMock(side_effect=RuntimeError("no mic"))
+        host = Host(
+            make_network(),
+            PSK,
+            transport,
+            clock=clock,
+            on_start=on_start,
+            on_stop=MagicMock(),
+        )
+        register(host, clock, CLIENT_A, "vm")
+        send_start(host, clock, CLIENT_A, "vm", "sess1")
+        assert host.state == "idle"
+        assert host.session is None
+        states = sent_of_type(transport, protocol.TYPE_STATE, CLIENT_A)
+        seen = [s[0]["state"] for s in states]
+        assert "error" in seen
+        assert seen[-1] == "idle"
+
+    def test_failing_on_start_aborts_local_session(self):
+        clock = FakeClock()
+        transport = FakeTransport()
+        on_start = MagicMock(side_effect=RuntimeError("no mic"))
+        host = Host(
+            make_network(),
+            PSK,
+            transport,
+            clock=clock,
+            on_start=on_start,
+            on_stop=MagicMock(),
+        )
+        assert host.local_start() is False
+        assert host.state == "idle"
+
+
 class TestHostStub:
     def test_host_constructible(self):
         host, _, _, _, _ = make_host()

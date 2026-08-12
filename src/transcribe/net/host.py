@@ -70,6 +70,54 @@ class Host:
     def initiator(self) -> str | None:
         return self._initiator_label
 
+    @property
+    def initiator_addr(self):
+        """The initiating client's address, or None for a local
+        (host-hotkey) session."""
+        return self._initiator_addr
+
+    def local_start(self) -> bool:
+        """Start a session from the host's own hotkey."""
+        now = self._clock()
+        if self._state != "idle":
+            return False
+        if (
+            self._last_start is not None
+            and now - self._last_start < START_RATE_LIMIT
+        ):
+            return False
+        self._last_start = now
+        self._session = uuid.uuid4().hex
+        self._initiator_label = "host"
+        self._initiator_addr = None
+        self._started_at = now
+        self._state = "recording"
+        if not self._run_on_start():
+            return False
+        self.publish_state()
+        logger.info("Session %s started locally", self._session)
+        return True
+
+    def local_stop(self) -> bool:
+        """Stop the active recording from the host's own hotkey."""
+        if self._state != "recording":
+            return False
+        self._begin_transcribing()
+        return True
+
+    def _run_on_start(self) -> bool:
+        """Invoke on_start; on failure abort the session cleanly."""
+        try:
+            if self._on_start is not None:
+                self._on_start()
+        except Exception:
+            logger.exception("Recording failed to start")
+            self._state = "error"
+            self.publish_state()
+            self.finish_session()
+            return False
+        return True
+
     # -- sending ------------------------------------------------------
 
     def _send(self, msg_type: int, body: dict, addr) -> bytes:
@@ -119,7 +167,8 @@ class Host:
                 targets.add(self._initiator_addr)
         else:
             if self._initiator_addr is None:
-                logger.warning("No initiator to deliver text to")
+                # local (host-hotkey) session: nothing to network
+                logger.debug("Local session; text stays on the host")
                 return
             targets = {self._initiator_addr}
         bodies = protocol.split_message(
@@ -222,8 +271,8 @@ class Host:
             self._started_at = now
             self._state = "recording"
             self._ack(body["id"], addr)
-            if self._on_start is not None:
-                self._on_start()
+            if not self._run_on_start():
+                return
             self.publish_state()
             logger.info("Session %s started by %r", session, label)
         elif self._state == "recording" and session == self._session:
