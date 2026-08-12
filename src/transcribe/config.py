@@ -1,9 +1,106 @@
+import base64
+import binascii
+import os
 import platform
 import tomllib
 from pathlib import Path
 
 DEFAULT_MODEL = "nvidia/parakeet-tdt-0.6b-v3"
 DEFAULT_HOTKEY = "ctrl+shift+;"
+
+NETWORK_DEFAULTS = {
+    "mode": "standalone",
+    "bind_host": "0.0.0.0",
+    "bind_port": 47800,
+    "also_paste_locally": False,
+    "host_hotkey": False,
+    "subscriber_ttl": 30,
+    "max_record_seconds": 60,
+    "deliver_to": "initiator",
+    "allowed_clients": None,
+    "server_host": "127.0.0.1",
+    "server_port": 47800,
+    "renew_interval": 10,
+    "client_label": "",
+    "ack": True,
+    "max_retries": 4,
+    "retry_backoff_ms": 150,
+    "max_datagram_bytes": 1200,
+    "max_message_bytes": 65536,
+    "key_env": "TRANSCRIBE_PSK",
+    "key_file": None,
+    "clock_skew": 30,
+}
+
+
+class ConfigError(Exception):
+    """A configuration value is missing or invalid."""
+
+
+def load_network_config(section: dict | None = None) -> dict:
+    """Merge a [tool.transcribe.network] section over the defaults."""
+    network = dict(NETWORK_DEFAULTS)
+    if section:
+        unknown = set(section) - set(NETWORK_DEFAULTS)
+        if unknown:
+            raise ConfigError(
+                "unknown [tool.transcribe.network] keys: "
+                + ", ".join(sorted(unknown))
+            )
+        network.update(section)
+    if network["mode"] not in ("standalone", "host", "client"):
+        raise ConfigError(
+            f"invalid network mode: {network['mode']!r} "
+            "(expected standalone, host, or client)"
+        )
+    if network["deliver_to"] not in ("initiator", "all"):
+        raise ConfigError(
+            f"invalid deliver_to: {network['deliver_to']!r} "
+            "(expected initiator or all)"
+        )
+    return network
+
+
+def _decode_psk(value: str, source: str) -> bytes:
+    try:
+        key = base64.b64decode(value.strip(), validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise ConfigError(f"invalid base64 key from {source}: {exc}") from exc
+    if len(key) != 32:
+        raise ConfigError(
+            f"key from {source} must be 32 bytes, got {len(key)}"
+        )
+    return key
+
+
+def resolve_psk(network: dict, environ: dict | None = None) -> bytes:
+    """Resolve the pre-shared key: env var first, then key_file.
+
+    Raises ConfigError if no key is configured or the key is
+    malformed. Never returns a default — networked modes must
+    refuse to start without a real key.
+    """
+    if environ is None:
+        environ = os.environ
+    env_name = network.get("key_env") or "TRANSCRIBE_PSK"
+    value = environ.get(env_name)
+    if value:
+        return _decode_psk(value, f"${env_name}")
+    key_file = network.get("key_file")
+    if key_file:
+        path = Path(key_file).expanduser()
+        try:
+            content = path.read_text()
+        except OSError as exc:
+            raise ConfigError(
+                f"cannot read key_file {key_file}: {exc}"
+            ) from exc
+        return _decode_psk(content, str(path))
+    raise ConfigError(
+        f"no pre-shared key configured: set ${env_name} or key_file "
+        "(generate one with `transcribe keygen`)"
+    )
+
 
 DEFAULT_MODEL_MACOS = "mlx-community/whisper-large-v3-turbo"
 DEFAULT_HOTKEY_MACOS = "super+shift+'"
@@ -32,6 +129,7 @@ def load_config() -> dict:
             "replacements": {},
             "custom_terms": [],
             "custom_terms_threshold": 0.8,
+            "network": load_network_config(None),
         }
     with open(pyproject, "rb") as f:
         data = tomllib.load(f)
@@ -48,6 +146,7 @@ def load_config() -> dict:
         "replacements": replacements,
         "custom_terms": custom_terms_section.get("terms", []),
         "custom_terms_threshold": custom_terms_section.get("threshold", 0.8),
+        "network": load_network_config(section.get("network")),
     }
 
 
