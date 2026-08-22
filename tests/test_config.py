@@ -53,13 +53,90 @@ class TestParseHotkey:
 
 
 class TestLoadConfig:
-    def test_returns_defaults_when_no_section(self):
-        config = load_config()
+    def test_returns_defaults_when_no_files(self, tmp_path):
+        config = load_config(root=tmp_path)
         assert "model" in config
         assert "hotkey" in config
         assert config["replacements"] == {}
         assert config["custom_terms"] == []
         assert config["custom_terms_threshold"] == 0.8
+        assert config["network"]["mode"] == "standalone"
+
+    def test_reads_transcribe_toml(self, tmp_path):
+        (tmp_path / "transcribe.toml").write_text(
+            'model = "nvidia/parakeet-rnnt-1.1b"\nhotkey = "alt+shift+space"\n'
+        )
+        config = load_config(root=tmp_path)
+        assert config["model"] == "nvidia/parakeet-rnnt-1.1b"
+        assert config["hotkey"] == "alt+shift+space"
+
+    def test_transcribe_toml_network_section(self, tmp_path):
+        (tmp_path / "transcribe.toml").write_text(
+            "[network]\n"
+            'mode = "client"\n'
+            'server_host = "10.211.55.2"\n'
+            'client_label = "nixos-vm"\n'
+        )
+        config = load_config(root=tmp_path)
+        assert config["network"]["mode"] == "client"
+        assert config["network"]["server_host"] == "10.211.55.2"
+        assert config["network"]["client_label"] == "nixos-vm"
+        assert config["network"]["server_port"] == 47800
+
+    def test_transcribe_toml_replacements_and_terms(self, tmp_path):
+        (tmp_path / "transcribe.toml").write_text(
+            "[replacements]\n"
+            'comet = "commit"\n'
+            "[custom_terms]\n"
+            'terms = ["Birkbeck"]\n'
+            "threshold = 0.9\n"
+        )
+        config = load_config(root=tmp_path)
+        assert config["replacements"] == {"comet": "commit"}
+        assert config["custom_terms"] == ["Birkbeck"]
+        assert config["custom_terms_threshold"] == 0.9
+
+    def test_falls_back_to_pyproject_tool_section(self, tmp_path):
+        (tmp_path / "pyproject.toml").write_text(
+            "[tool.transcribe]\n"
+            'hotkey = "ctrl+alt+t"\n'
+            "[tool.transcribe.network]\n"
+            'mode = "host"\n'
+        )
+        config = load_config(root=tmp_path)
+        assert config["hotkey"] == "ctrl+alt+t"
+        assert config["network"]["mode"] == "host"
+
+    def test_notifications_default_all_on(self, tmp_path):
+        config = load_config(root=tmp_path)
+        assert config["notifications"] == {"visual": True, "sound": True}
+
+    def test_notifications_section_disables_channels(self, tmp_path):
+        (tmp_path / "transcribe.toml").write_text(
+            "[notifications]\nvisual = false\nsound = false\n"
+        )
+        config = load_config(root=tmp_path)
+        assert config["notifications"] == {"visual": False, "sound": False}
+
+    def test_notifications_partial_section(self, tmp_path):
+        (tmp_path / "transcribe.toml").write_text(
+            "[notifications]\nsound = false\n"
+        )
+        config = load_config(root=tmp_path)
+        assert config["notifications"] == {"visual": True, "sound": False}
+
+    def test_transcribe_toml_wins_over_pyproject(self, tmp_path):
+        (tmp_path / "pyproject.toml").write_text(
+            "[tool.transcribe]\n"
+            'hotkey = "ctrl+alt+t"\n'
+            "[tool.transcribe.network]\n"
+            'mode = "host"\n'
+        )
+        (tmp_path / "transcribe.toml").write_text('hotkey = "super+shift+z"\n')
+        config = load_config(root=tmp_path)
+        assert config["hotkey"] == "super+shift+z"
+        # transcribe.toml replaces the pyproject section entirely
+        assert config["network"]["mode"] == "standalone"
 
     def test_defaults_are_correct(self):
         assert DEFAULT_MODEL == "nvidia/parakeet-tdt-0.6b-v3"
@@ -129,8 +206,8 @@ class TestLoadNetworkConfig:
         with pytest.raises(ConfigError, match="unknown"):
             load_network_config({"srever_host": "10.0.0.1"})
 
-    def test_load_config_includes_network(self):
-        config = load_config()
+    def test_load_config_includes_network(self, tmp_path):
+        config = load_config(root=tmp_path)
         assert config["network"]["mode"] == "standalone"
 
 

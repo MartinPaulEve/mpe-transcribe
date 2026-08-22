@@ -1,9 +1,36 @@
+import logging
 import subprocess
+
+logger = logging.getLogger(__name__)
+
+
+class FilteredNotifier:
+    """Wraps a platform notifier, silencing disabled channels."""
+
+    def __init__(self, inner, visual: bool = True, sound: bool = True):
+        self._inner = inner
+        self._visual = visual
+        self._sound = sound
+
+    def notify(self, title: str, body: str):
+        if self._visual:
+            self._inner.notify(title, body)
+
+    def ding(self):
+        if self._sound:
+            self._inner.ding()
+
+    def notify_and_ding(self, title: str, body: str):
+        self.notify(title, body)
+        self.ding()
 
 
 class AppNotifier:
     def notify(self, title: str, body: str):
-        subprocess.run(["notify-send", title, body], check=False)
+        try:
+            subprocess.run(["notify-send", title, body], check=False)
+        except OSError as exc:
+            logger.warning("Desktop notification unavailable: %s", exc)
 
     def ding(self):
         # Lazy import: client-mode installs have no sounddevice.

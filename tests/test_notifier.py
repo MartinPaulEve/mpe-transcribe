@@ -3,7 +3,25 @@ from unittest.mock import patch
 
 import numpy as np
 
-from transcribe.notifier import AppNotifier
+from transcribe.notifier import AppNotifier, FilteredNotifier
+
+
+class RecordingNotifier:
+    """Test double capturing which channels actually fired."""
+
+    def __init__(self):
+        self.notifications = []
+        self.dings = 0
+
+    def notify(self, title, body):
+        self.notifications.append((title, body))
+
+    def ding(self):
+        self.dings += 1
+
+    def notify_and_ding(self, title, body):
+        self.notify(title, body)
+        self.ding()
 
 
 class TestAppNotifier:
@@ -47,3 +65,64 @@ class TestAppNotifier:
         freqs = np.fft.rfftfreq(len(tone), 1.0 / 44100)
         peak_freq = freqs[np.argmax(np.abs(fft))]
         assert 870 < peak_freq < 890
+
+    def test_notify_survives_missing_notify_send(self):
+        with patch(
+            "transcribe.notifier.subprocess.run",
+            side_effect=FileNotFoundError(2, "No such file", "notify-send"),
+        ):
+            notifier = AppNotifier()
+            notifier.notify("Title", "Body")  # must not raise
+
+    def test_notify_and_ding_survives_missing_notify_send(self):
+        with patch(
+            "transcribe.notifier.subprocess.run",
+            side_effect=FileNotFoundError(2, "No such file", "notify-send"),
+        ):
+            notifier = AppNotifier()
+            notifier.notify_and_ding("Title", "Body")  # must not raise
+        self.mock_sd.play.assert_called_once()
+
+
+class TestFilteredNotifier:
+    def test_defaults_pass_everything_through(self):
+        inner = RecordingNotifier()
+        filtered = FilteredNotifier(inner)
+        filtered.notify_and_ding("T", "B")
+        assert inner.notifications == [("T", "B")]
+        assert inner.dings == 1
+
+    def test_visual_off_silences_notify(self):
+        inner = RecordingNotifier()
+        filtered = FilteredNotifier(inner, visual=False)
+        filtered.notify("T", "B")
+        assert inner.notifications == []
+
+    def test_visual_off_keeps_sound(self):
+        inner = RecordingNotifier()
+        filtered = FilteredNotifier(inner, visual=False)
+        filtered.notify_and_ding("T", "B")
+        assert inner.notifications == []
+        assert inner.dings == 1
+
+    def test_sound_off_silences_ding(self):
+        inner = RecordingNotifier()
+        filtered = FilteredNotifier(inner, sound=False)
+        filtered.ding()
+        assert inner.dings == 0
+
+    def test_sound_off_keeps_visual(self):
+        inner = RecordingNotifier()
+        filtered = FilteredNotifier(inner, sound=False)
+        filtered.notify_and_ding("T", "B")
+        assert inner.notifications == [("T", "B")]
+        assert inner.dings == 0
+
+    def test_both_off_silences_everything(self):
+        inner = RecordingNotifier()
+        filtered = FilteredNotifier(inner, visual=False, sound=False)
+        filtered.notify_and_ding("T", "B")
+        filtered.notify("T", "B")
+        filtered.ding()
+        assert inner.notifications == []
+        assert inner.dings == 0

@@ -19,7 +19,7 @@ Supports **Linux** (X11/Wayland with NVIDIA Parakeet), **macOS** (Apple Silicon 
 
 The app can be split across the network: a **host** (e.g. an Apple Silicon Mac) records and transcribes, while a **client** (e.g. a Linux VM in Parallels, which has no usable GPU) triggers transcriptions with its hotkey and pastes the text locally. The host's microphone is used, so no audio crosses the network — traffic is encrypted and authenticated UDP protected by a pre-shared key.
 
-Generate a shared key with `uv run transcribe keygen`, set `mode = "host"` / `mode = "client"` under `[tool.transcribe.network]` in `pyproject.toml` (or use the `--host` / `--client` flags), and install a lightweight client-only service with `./scripts/install_client.sh` — clients need none of the model/GPU/audio stack (`uv sync --extra client-linux` or `--extra client-macos`). Full-stack installs keep using the `linux`, `macos`, and `windows` extras as before.
+Generate a shared key with `uv run transcribe keygen`, set `mode = "host"` / `mode = "client"` under `[network]` in `transcribe.toml` (or use the `--host` / `--client` flags), and install a lightweight client-only service with `./scripts/install_client.sh` — clients need none of the model/GPU/audio stack (`uv sync --extra client-linux` or `--extra client-macos`). Full-stack installs keep using the `linux`, `macos`, and `windows` extras as before.
 
 See **[docs/NETWORK.md](docs/NETWORK.md)** for the full guide: configuration reference, security model, protocol, and troubleshooting.
 
@@ -27,10 +27,13 @@ See **[docs/NETWORK.md](docs/NETWORK.md)** for the full guide: configuration ref
 
 ## Configuration
 
-Edit the `[tool.transcribe]` section in `pyproject.toml`:
+User configuration lives in `transcribe.toml` in the repo root. It is gitignored, so your machine-specific settings never end up in version control. Copy the template to get started:
+
+```bash
+cp transcribe.toml.example transcribe.toml
+```
 
 ```toml
-[tool.transcribe]
 # Uncomment to override the platform default:
 # model = "nvidia/parakeet-tdt-0.6b-v3"      # Linux / Windows
 # model = "mlx-community/whisper-large-v3-turbo"  # macOS
@@ -39,18 +42,18 @@ Edit the `[tool.transcribe]` section in `pyproject.toml`:
 # hotkey = "super+shift+'"    # macOS default (Cmd+Shift+')
 ```
 
-The app automatically selects the appropriate model and hotkey for your platform. Override in `pyproject.toml` only if you want a non-default choice.
+The app automatically selects the appropriate model and hotkey for your platform, so `transcribe.toml` is only needed for non-default choices. (For backwards compatibility, a `[tool.transcribe]` section in `pyproject.toml` is still read when no `transcribe.toml` exists.)
 
 ### Voice recognition corrections
 
-If the transcriber consistently misrecognises certain words or names, you can define corrections in `pyproject.toml`. Two types are supported:
+If the transcriber consistently misrecognises certain words or names, you can define corrections in `transcribe.toml`. Two types are supported:
 
 #### Exact replacements
 
 Case-insensitive find-and-replace applied to every transcription. The key is what the transcriber produces; the value is what you actually meant:
 
 ```toml
-[tool.transcribe.replacements]
+[replacements]
 comet = "commit"
 "martin poll eve" = "Martin Paul Eve"
 ```
@@ -60,7 +63,7 @@ comet = "commit"
 For names and phrases that get transcribed in unpredictably wrong ways, fuzzy matching uses similarity scoring to catch close misspellings automatically:
 
 ```toml
-[tool.transcribe.custom_terms]
+[custom_terms]
 terms = ["Martin Paul Eve", "Birkbeck"]
 threshold = 0.8   # optional, default 0.8 (0.0–1.0)
 ```
@@ -154,7 +157,7 @@ IDLE ──[hotkey]──> RECORDING ──[hotkey]──> TRANSCRIBING ──[d
 | `app.py` | State machine orchestrator; dispatches standalone/host/client modes |
 | `session.py` | Detects macOS vs Windows vs X11 vs Wayland session |
 | `factory.py` | Creates the correct backend for the session (hotkey, clipboard, transcriber, notifier) |
-| `config.py` | Reads `[tool.transcribe]` (and `[tool.transcribe.network]`) from pyproject.toml, platform-aware defaults, pre-shared key resolution |
+| `config.py` | Reads `transcribe.toml` (falling back to `[tool.transcribe]` in pyproject.toml), platform-aware defaults, pre-shared key resolution |
 | `corrections.py` | Post-transcription text corrections: exact replacements and fuzzy term matching |
 | `recorder.py` | 16 kHz mono audio capture via PortAudio |
 | `transcriber.py` | Linux: NeMo Parakeet model inference |

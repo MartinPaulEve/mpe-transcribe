@@ -82,7 +82,8 @@ class TranscribeApp:
         self._hotkey = create_hotkey_listener(
             self.toggle, modifiers=modifiers, key=key
         )
-        self._notifier = create_notifier()
+        notifications = self._config.get("notifications", {})
+        self._notifier = create_notifier(**notifications)
         self._clipboard = create_clipboard()
         self._lock = threading.Lock()
         self._stop_event = threading.Event()
@@ -231,7 +232,8 @@ class HostApp:
         self._transcriber = create_transcriber(
             self._config["model"], initial_prompt=prompt
         )
-        self._notifier = create_notifier()
+        notifications = self._config.get("notifications", {})
+        self._notifier = create_notifier(**notifications)
         self._clipboard = None
         if self._network["also_paste_locally"] or self._network["host_hotkey"]:
             self._clipboard = create_clipboard()
@@ -408,7 +410,8 @@ class ClientApp:
         self._hotkey = create_hotkey_listener(
             self._trigger, modifiers=modifiers, key=key
         )
-        self._notifier = create_notifier()
+        notifications = self._config.get("notifications", {})
+        self._notifier = create_notifier(**notifications)
         self._clipboard = create_clipboard()
         self._lock = threading.Lock()
         self._stop_event = threading.Event()
@@ -427,7 +430,9 @@ class ClientApp:
             self._notifier.notify("Transcribe", "Transcription error")
 
     def _on_text(self, text: str):
+        logger.info("Text received (%d chars); pasting", len(text))
         self._clipboard.paste_text(text)
+        logger.info("Paste complete")
         self._notifier.notify("Transcribe", "Pasted!")
 
     def run(self):

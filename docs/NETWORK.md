@@ -18,7 +18,7 @@ A client needs none of the transcription stack — no NeMo, no MLX, no model, no
 | `host` | Records + transcribes here; serves clients over UDP | `mode = "host"` or `--host` |
 | `client` | Hotkey + paste only; a remote host transcribes | `mode = "client"` or `--client` |
 
-Mode is set in `[tool.transcribe.network]` in `pyproject.toml`; the CLI flags override the config. Client mode also accepts `--server-host` and `--server-port` overrides.
+Mode is set in `[network]` in `transcribe.toml` (copy `transcribe.toml.example` in the repo root; the file is gitignored, so each machine keeps its own role); the CLI flags override the config. Client mode also accepts `--server-host` and `--server-port` overrides.
 
 ## Quick start
 
@@ -28,14 +28,14 @@ Mode is set in `[tool.transcribe.network]` in `pyproject.toml`; the CLI flags ov
 uv run transcribe keygen
 ```
 
-This prints a fresh base64-encoded 32-byte key. Host and clients must use the **same** key. Never put it in `pyproject.toml` (that file is committed to git) — supply it via the `TRANSCRIBE_PSK` environment variable or a `chmod 600` key file (see [Security model](#security-model)).
+This prints a fresh base64-encoded 32-byte key. Host and clients must use the **same** key. Never put it in a committed file — supply it via the `TRANSCRIBE_PSK` environment variable or a `chmod 600` key file (see [Security model](#security-model)).
 
 ### 2. Configure the host (the Mac)
 
-In the host's `pyproject.toml`:
+In the host's `transcribe.toml`:
 
 ```toml
-[tool.transcribe.network]
+[network]
 mode = "host"
 # key_file = "~/.config/transcribe/psk.key"   # or export TRANSCRIBE_PSK
 ```
@@ -58,10 +58,10 @@ With `mode = "host"` in the config, a plain `uv run transcribe` (or the existing
 
 ### 3. Configure the client (the VM)
 
-In the client's checkout of `pyproject.toml`:
+In the client checkout's `transcribe.toml`:
 
 ```toml
-[tool.transcribe.network]
+[network]
 mode = "client"
 server_host = "10.211.55.2"    # the host as seen from the VM
 client_label = "nixos-vm"      # optional, identifies this client
@@ -108,7 +108,7 @@ Press the hotkey in the VM — the host starts recording (notification + ding on
 
 ## Configuration reference
 
-All keys live in `[tool.transcribe.network]` in `pyproject.toml`. Every key is optional; the defaults preserve standalone behaviour. Unknown keys are rejected at startup.
+All keys live in `[network]` in `transcribe.toml`. Every key is optional; the defaults preserve standalone behaviour. Unknown keys are rejected at startup.
 
 ### Mode
 
@@ -159,7 +159,7 @@ All keys live in `[tool.transcribe.network]` in `pyproject.toml`. Every key is o
 ### Example: host
 
 ```toml
-[tool.transcribe.network]
+[network]
 mode = "host"
 # bind_host = "0.0.0.0"
 # bind_port = 47800
@@ -174,7 +174,7 @@ key_file = "~/.config/transcribe/psk.key"
 ### Example: client
 
 ```toml
-[tool.transcribe.network]
+[network]
 mode = "client"
 server_host = "10.211.55.2"      # the host, as seen from this machine
 # server_port = 47800
@@ -186,7 +186,7 @@ client_label = "nixos-vm"
 
 A client pastes received text into whatever window is focused — possibly a terminal — and a forged START/STOP could drive the host's microphone. Both directions are therefore authenticated:
 
-- **Pre-shared key.** One high-entropy 32-byte key per deployment, generated with `transcribe keygen`. Resolution order: the environment variable named by `key_env` (default `TRANSCRIBE_PSK`) first, then `key_file`. If neither yields a key, host and client modes **refuse to start** — there is no unauthenticated fallback. **Never store the key in `pyproject.toml`**; it is committed to version control.
+- **Pre-shared key.** One high-entropy 32-byte key per deployment, generated with `transcribe keygen`. Resolution order: the environment variable named by `key_env` (default `TRANSCRIBE_PSK`) first, then `key_file`. If neither yields a key, host and client modes **refuse to start** — there is no unauthenticated fallback. **Never store the key in a committed file** such as `pyproject.toml`.
 - **AEAD encryption.** Every datagram body is encrypted and authenticated with ChaCha20-Poly1305, using a key derived from the PSK via HKDF-SHA256 (so the raw PSK is never used directly) and a fresh random 12-byte nonce per datagram. The frame header is bound as associated data, so it cannot be tampered with either. Any datagram that fails to decrypt is dropped silently — no error replies, no oracle.
 - **Replay protection.** Bodies carry a timestamp and a random id. Anything timestamped outside ±`clock_skew` seconds of local time is dropped, and seen ids are cached (expiring after 2 × `clock_skew`) so a captured datagram cannot be replayed — a replayed START never re-triggers the mic, and a replayed TEXT never pastes twice.
 - **Trigger control.** Set `allowed_clients` on the host to restrict which client labels may start/stop recordings. STARTs are additionally rate-limited (at most one per second), and the subscriber registry is capped.

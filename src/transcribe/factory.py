@@ -72,18 +72,27 @@ def create_transcriber(model_name: str, initial_prompt: str | None = None):
         return Transcriber(model_name=model_name)
 
 
-def create_notifier():
-    """Create a notifier for the current session type."""
+def create_notifier(visual: bool = True, sound: bool = True):
+    """Create a notifier for the current session type.
+
+    Channels disabled in config ([notifications] visual/sound) are
+    silenced by wrapping the platform notifier.
+    """
     session = detect_session()
     if session == "macos":
         from transcribe.macos_notifier import MacOSNotifier
 
-        return MacOSNotifier()
+        notifier = MacOSNotifier()
     elif session == "windows":
         from transcribe.windows_notifier import WindowsNotifier
 
-        return WindowsNotifier()
+        notifier = WindowsNotifier()
     else:
         from transcribe.notifier import AppNotifier
 
-        return AppNotifier()
+        notifier = AppNotifier()
+    if visual and sound:
+        return notifier
+    from transcribe.notifier import FilteredNotifier
+
+    return FilteredNotifier(notifier, visual=visual, sound=sound)

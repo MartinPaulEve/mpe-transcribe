@@ -66,17 +66,16 @@ Press to start recording, press again to stop. The transcribed text is pasted in
 
 ## Configuration
 
-Edit the `[tool.transcribe]` section in `pyproject.toml`:
+Edit `transcribe.toml` in the repo root (copy `transcribe.toml.example` if you don't have one yet):
 
 ```toml
-[tool.transcribe]
 model = "nvidia/parakeet-tdt-0.6b-v3"   # default; or "nvidia/parakeet-rnnt-1.1b" for higher accuracy
 hotkey = "ctrl+shift+;"                  # default
 ```
 
 ## Voice recognition corrections
 
-If the transcriber consistently gets certain words wrong, you can define corrections in `pyproject.toml`. See the [Configuration section in the README](../README.md#voice-recognition-corrections) for full details.
+If the transcriber consistently gets certain words wrong, you can define corrections in `transcribe.toml`. See the [Configuration section in the README](../README.md#voice-recognition-corrections) for full details.
 
 ## Model choices
 

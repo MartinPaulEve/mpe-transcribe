@@ -46,7 +46,7 @@ The first run will download the Whisper model (~1.4 GB) from Hugging Face. Subse
 
 ### Using this Mac as a transcription host
 
-The Mac can also serve networked **clients** (e.g. a Linux VM in Parallels): the client's hotkey triggers a recording on the Mac's mic, the Mac transcribes, and the text is pasted back in the client. Set `mode = "host"` under `[tool.transcribe.network]` in `pyproject.toml` (or run `uv run transcribe --host`) and share a key generated with `uv run transcribe keygen`. See [NETWORK.md](NETWORK.md).
+The Mac can also serve networked **clients** (e.g. a Linux VM in Parallels): the client's hotkey triggers a recording on the Mac's mic, the Mac transcribes, and the text is pasted back in the client. Set `mode = "host"` under `[network]` in `transcribe.toml` (or run `uv run transcribe --host`) and share a key generated with `uv run transcribe keygen`. See [NETWORK.md](NETWORK.md).
 
 ## Permissions
 
@@ -152,10 +152,9 @@ cat /tmp/transcribe.stdout.log        # stdout (usually empty)
 
 ### Changing the hotkey
 
-Edit `pyproject.toml`:
+Edit `transcribe.toml` (copy `transcribe.toml.example` if you don't have one yet):
 
 ```toml
-[tool.transcribe]
 hotkey = "super+shift+'"      # macOS default (Cmd+Shift+')
 ```
 
@@ -167,16 +166,15 @@ After changing the hotkey, reinstall (the hotkey is compiled into the launcher):
 
 ### Voice recognition corrections
 
-If the transcriber consistently gets certain words wrong, you can define corrections in `pyproject.toml`. See the [Configuration section in the README](../README.md#voice-recognition-corrections) for full details.
+If the transcriber consistently gets certain words wrong, you can define corrections in `transcribe.toml`. See the [Configuration section in the README](../README.md#voice-recognition-corrections) for full details.
 
 On macOS, custom terms are additionally passed to Whisper as an `initial_prompt`, which biases the model toward recognising them correctly at the transcription stage itself — giving you two layers of correction (model-level + post-processing).
 
 ### Changing the model
 
-Edit `pyproject.toml`:
+Edit `transcribe.toml`:
 
 ```toml
-[tool.transcribe]
 model = "mlx-community/whisper-large-v3-turbo"   # default
 ```
 

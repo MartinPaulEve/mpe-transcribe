@@ -1,0 +1,80 @@
+# User configuration for transcribe.
+#
+# Copy this file to transcribe.toml (in the repo root, next to
+# pyproject.toml) and edit it. transcribe.toml is gitignored, so
+# your machine-specific settings (model, hotkey, network role)
+# never end up in version control.
+#
+# Every key is optional — an empty transcribe.toml (or none at
+# all) runs standalone with platform defaults.
+
+# ---------------------------------------------------------------
+# Model
+# ---------------------------------------------------------------
+# Linux model choices (requires NVIDIA GPU with CUDA):
+#   "nvidia/parakeet-tdt-0.6b-v3"   - fast, lightweight (~2GB VRAM, default on Linux)
+#   "nvidia/parakeet-rnnt-1.1b"     - slower, higher accuracy (~4GB VRAM)
+#
+# macOS model choices (Apple Silicon M1/M2/M3/M4, uses Metal via MLX):
+#   "mlx-community/whisper-large-v3-turbo" - best accuracy/speed (~1.4GB, default on macOS)
+#   "mlx-community/whisper-small"          - faster startup, lower accuracy (~488MB)
+#   "mlx-community/whisper-base"           - fastest, lowest accuracy (~142MB)
+#
+# Windows model choices (requires NVIDIA GPU with CUDA):
+#   "nvidia/parakeet-tdt-0.6b-v3"   - fast, lightweight (~2GB VRAM, default on Windows)
+#   "nvidia/parakeet-rnnt-1.1b"     - slower, higher accuracy (~4GB VRAM)
+#
+# The default model is selected automatically based on your platform.
+# Uncomment one of the lines below to override:
+# model = "nvidia/parakeet-tdt-0.6b-v3"
+# model = "mlx-community/whisper-large-v3-turbo"
+
+# ---------------------------------------------------------------
+# Hotkey
+# ---------------------------------------------------------------
+# Hotkey as modifier+key string. Modifiers: ctrl, shift, alt, super
+# Key: any single character or key name
+# Default: "ctrl+shift+;" on Linux/Windows, "super+shift+'" on macOS (Cmd+Shift+')
+# hotkey = "ctrl+shift+;"
+
+# ---------------------------------------------------------------
+# Corrections
+# ---------------------------------------------------------------
+# Voice recognition corrections — fix commonly misrecognized words.
+# Exact replacements (case-insensitive). The key is what the
+# transcriber produces; the value is what you actually meant.
+# [replacements]
+# comet = "commit"
+# "martin poll eve" = "Martin Paul Eve"
+
+# Fuzzy-matched terms — if the transcriber produces something
+# close to one of these terms, it will be corrected automatically.
+# Uses similarity matching, so minor misspellings are caught.
+# [custom_terms]
+# terms = ["Martin Paul Eve", "Birkbeck"]
+# threshold = 0.8
+
+# ---------------------------------------------------------------
+# Notifications
+# ---------------------------------------------------------------
+# Each channel can be turned off independently. Defaults: all on.
+# [notifications]
+# visual = true   # desktop notifications (Recording/Transcribing/Pasted)
+# sound = true    # the ding on state changes
+
+# ---------------------------------------------------------------
+# Network (host/client mode)
+# ---------------------------------------------------------------
+# Omit this section entirely for standalone operation. See
+# docs/NETWORK.md for all keys and how to generate a shared key
+# with `uv run transcribe keygen`.
+#
+# On the machine with the mic + GPU/model:
+# [network]
+# mode = "host"
+#
+# On a lightweight client (e.g. a VM):
+# [network]
+# mode = "client"
+# server_host = "192.168.1.10"
+# client_label = "my-vm"

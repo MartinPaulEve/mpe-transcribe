@@ -38,14 +38,13 @@ class ConfigError(Exception):
 
 
 def load_network_config(section: dict | None = None) -> dict:
-    """Merge a [tool.transcribe.network] section over the defaults."""
+    """Merge a [network] section over the defaults."""
     network = dict(NETWORK_DEFAULTS)
     if section:
         unknown = set(section) - set(NETWORK_DEFAULTS)
         if unknown:
             raise ConfigError(
-                "unknown [tool.transcribe.network] keys: "
-                + ", ".join(sorted(unknown))
+                "unknown [network] keys: " + ", ".join(sorted(unknown))
             )
         network.update(section)
     if network["mode"] not in ("standalone", "host", "client"):
@@ -118,34 +117,42 @@ def _default_hotkey() -> str:
     return DEFAULT_HOTKEY
 
 
-def load_config() -> dict:
-    pyproject = Path(__file__).resolve().parents[2] / "pyproject.toml"
-    model_default = _default_model()
-    hotkey_default = _default_hotkey()
-    if not pyproject.exists():
-        return {
-            "model": model_default,
-            "hotkey": hotkey_default,
-            "replacements": {},
-            "custom_terms": [],
-            "custom_terms_threshold": 0.8,
-            "network": load_network_config(None),
-        }
-    with open(pyproject, "rb") as f:
-        data = tomllib.load(f)
-    section = data.get("tool", {}).get("transcribe", {})
-    replacements = (
-        data.get("tool", {}).get("transcribe", {}).get("replacements", {})
-    )
-    custom_terms_section = (
-        data.get("tool", {}).get("transcribe", {}).get("custom_terms", {})
-    )
+def _load_user_section(root: Path) -> dict:
+    """Load the user config section.
+
+    Prefers transcribe.toml (flat keys, no [tool.transcribe]
+    wrapper); falls back to [tool.transcribe] in pyproject.toml
+    for older setups. When transcribe.toml exists it replaces the
+    pyproject section entirely — the two are never merged.
+    """
+    config_file = root / "transcribe.toml"
+    if config_file.exists():
+        with open(config_file, "rb") as f:
+            return tomllib.load(f)
+    pyproject = root / "pyproject.toml"
+    if pyproject.exists():
+        with open(pyproject, "rb") as f:
+            data = tomllib.load(f)
+        return data.get("tool", {}).get("transcribe", {})
+    return {}
+
+
+def load_config(root: Path | None = None) -> dict:
+    if root is None:
+        root = Path(__file__).resolve().parents[2]
+    section = _load_user_section(root)
+    custom_terms_section = section.get("custom_terms", {})
+    notifications = section.get("notifications", {})
     return {
-        "model": section.get("model", model_default),
-        "hotkey": section.get("hotkey", hotkey_default),
-        "replacements": replacements,
+        "model": section.get("model", _default_model()),
+        "hotkey": section.get("hotkey", _default_hotkey()),
+        "replacements": section.get("replacements", {}),
         "custom_terms": custom_terms_section.get("terms", []),
         "custom_terms_threshold": custom_terms_section.get("threshold", 0.8),
+        "notifications": {
+            "visual": bool(notifications.get("visual", True)),
+            "sound": bool(notifications.get("sound", True)),
+        },
         "network": load_network_config(section.get("network")),
     }
 

@@ -119,3 +119,32 @@ class TestFactory:
 
         n = create_notifier()
         assert isinstance(n, WindowsNotifier)
+
+    @patch("transcribe.factory.detect_session", return_value="x11")
+    def test_create_notifier_visual_off_silences_notify(self, mock_detect):
+        n = create_notifier(visual=False)
+        with patch("transcribe.notifier.subprocess.run") as mock_run:
+            n.notify("T", "B")
+        mock_run.assert_not_called()
+
+    @patch("transcribe.factory.detect_session", return_value="x11")
+    def test_create_notifier_sound_off_silences_ding(self, mock_detect):
+        import sys
+
+        mock_sd = sys.modules["sounddevice"]
+        mock_sd.reset_mock()
+        n = create_notifier(sound=False)
+        n.ding()
+        mock_sd.play.assert_not_called()
+
+    @patch("transcribe.factory.detect_session", return_value="x11")
+    def test_create_notifier_visual_off_keeps_ding(self, mock_detect):
+        import sys
+
+        mock_sd = sys.modules["sounddevice"]
+        mock_sd.reset_mock()
+        n = create_notifier(visual=False)
+        with patch("transcribe.notifier.subprocess.run") as mock_run:
+            n.notify_and_ding("T", "B")
+        mock_run.assert_not_called()
+        mock_sd.play.assert_called_once()
