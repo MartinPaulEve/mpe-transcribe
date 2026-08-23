@@ -63,11 +63,15 @@ class WaylandClipboard:
             check=False,
         )
         time.sleep(0.05)
-        # Simulate Ctrl+V
+        # Simulate Ctrl+V. Space the key events at human typing
+        # speed: some Wayland apps double-process a synthetic chord
+        # whose press/release arrive sub-millisecond apart.
         subprocess.run(
             [
                 "ydotool",
                 "key",
+                "-d",
+                "40",
                 f"{_KEY_LEFTCTRL}:1",
                 f"{_KEY_V}:1",
                 f"{_KEY_V}:0",

@@ -111,6 +111,29 @@ class TestWaylandClipboard:
 
     @patch("transcribe.wayland_clipboard.time")
     @patch("transcribe.wayland_clipboard.subprocess")
+    def test_paste_chord_uses_human_speed_key_delay(
+        self, mock_sub, mock_time
+    ):
+        # Sub-millisecond synthetic chords can be double-processed by
+        # some Wayland apps; the Ctrl+V injection must space its key
+        # events at human typing speed.
+        mock_sub.run.return_value.returncode = 1
+        mock_sub.run.return_value.stdout = b""
+        cb = self._make_clipboard()
+        cb.paste_text("text")
+        chords = [
+            c[0][0]
+            for c in mock_sub.run.call_args_list
+            if c[0][0][0] == "ydotool" and "47:1" in c[0][0]
+        ]
+        assert len(chords) == 1
+        cmd = chords[0]
+        assert "-d" in cmd
+        delay_ms = int(cmd[cmd.index("-d") + 1])
+        assert delay_ms >= 40
+
+    @patch("transcribe.wayland_clipboard.time")
+    @patch("transcribe.wayland_clipboard.subprocess")
     def test_restore_delay_is_200ms(self, mock_sub, mock_time):
         def run_side_effect(cmd, **kwargs):
             result = MagicMock(returncode=0)
