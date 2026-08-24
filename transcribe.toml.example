@@ -7,6 +7,11 @@
 #
 # Every key is optional — an empty transcribe.toml (or none at
 # all) runs standalone with platform defaults.
+#
+# IMPORTANT: top-level keys (model, hotkey, paste_method) must
+# appear ABOVE the first [section] header — in TOML, a key written
+# below a header belongs to that section, and the app will reject
+# it as misplaced.
 
 # ---------------------------------------------------------------
 # Model
@@ -36,6 +41,17 @@
 # Key: any single character or key name
 # Default: "ctrl+shift+;" on Linux/Windows, "super+shift+'" on macOS (Cmd+Shift+')
 # hotkey = "ctrl+shift+;"
+
+# ---------------------------------------------------------------
+# Paste method (Wayland sessions)
+# ---------------------------------------------------------------
+# "ctrl+v" (default): put the text on the clipboard and inject a
+#          Ctrl+V chord. Uses xclip via the XWayland bridge when
+#          available (no focus-stealing transient surfaces).
+# "type":  type the text directly via ydotool — no clipboard, no
+#          Ctrl+V. Slower for long texts, but immune to any
+#          synthetic-paste misbehaviour.
+# paste_method = "ctrl+v"
 
 # ---------------------------------------------------------------
 # Corrections

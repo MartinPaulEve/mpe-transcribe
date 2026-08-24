@@ -137,10 +137,53 @@ def _load_user_section(root: Path) -> dict:
     return {}
 
 
+_KNOWN_TOP_LEVEL_KEYS = frozenset(
+    {
+        "model",
+        "hotkey",
+        "paste_method",
+        "replacements",
+        "custom_terms",
+        "notifications",
+        "network",
+    }
+)
+
+_KNOWN_SECTION_KEYS = {
+    "custom_terms": frozenset({"terms", "threshold"}),
+    "notifications": frozenset({"visual", "sound"}),
+}
+
+
+def _reject_unknown_keys(section: dict) -> None:
+    """Fail loudly on unknown or misplaced keys.
+
+    In TOML a key written below a [section] header belongs to that
+    section, so a misplaced top-level key (e.g. paste_method under
+    [custom_terms]) would otherwise be silently ignored.
+    """
+    unknown = set(section) - _KNOWN_TOP_LEVEL_KEYS
+    if unknown:
+        raise ConfigError("unknown config keys: " + ", ".join(sorted(unknown)))
+    for name, known in _KNOWN_SECTION_KEYS.items():
+        sub = section.get(name, {})
+        if not isinstance(sub, dict):
+            continue
+        unknown = set(sub) - known
+        if unknown:
+            raise ConfigError(
+                f"unknown [{name}] keys: "
+                + ", ".join(sorted(unknown))
+                + " (top-level keys must appear above the first "
+                "[section] header)"
+            )
+
+
 def load_config(root: Path | None = None) -> dict:
     if root is None:
         root = Path(__file__).resolve().parents[2]
     section = _load_user_section(root)
+    _reject_unknown_keys(section)
     custom_terms_section = section.get("custom_terms", {})
     notifications = section.get("notifications", {})
     paste_method = section.get("paste_method", "ctrl+v")

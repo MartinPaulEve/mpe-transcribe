@@ -141,6 +141,27 @@ class TestLoadConfig:
         with pytest.raises(ConfigError, match="paste_method"):
             load_config(root=tmp_path)
 
+    def test_unknown_top_level_key_raises(self, tmp_path):
+        (tmp_path / "transcribe.toml").write_text('paste_metod = "type"\n')
+        with pytest.raises(ConfigError, match="paste_metod"):
+            load_config(root=tmp_path)
+
+    def test_misplaced_key_in_custom_terms_raises(self, tmp_path):
+        # A top-level key written below a [section] header lands in
+        # that section; it must fail loudly, not silently no-op.
+        (tmp_path / "transcribe.toml").write_text(
+            '[custom_terms]\nterms = ["x"]\npaste_method = "type"\n'
+        )
+        with pytest.raises(ConfigError, match="paste_method"):
+            load_config(root=tmp_path)
+
+    def test_misplaced_key_in_notifications_raises(self, tmp_path):
+        (tmp_path / "transcribe.toml").write_text(
+            "[notifications]\nsound = false\nhotkey = false\n"
+        )
+        with pytest.raises(ConfigError, match="hotkey"):
+            load_config(root=tmp_path)
+
     def test_transcribe_toml_wins_over_pyproject(self, tmp_path):
         (tmp_path / "pyproject.toml").write_text(
             "[tool.transcribe]\n"
