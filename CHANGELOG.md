@@ -1,3 +1,10 @@
+## 1.8.1 (2026-08-24)
+
+### Fix
+
+- **app**: clearer stop notification, longer record safeguard, formatting
+- **session**: detect Wayland via runtime-dir socket when env is stale
+
 ## 1.8.0 (2026-08-24)
 
 ### Feat
