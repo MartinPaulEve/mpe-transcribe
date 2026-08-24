@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 from transcribe.clipboard_content import ClipboardContent
 from transcribe.wayland_clipboard import WaylandClipboard
@@ -134,7 +134,44 @@ class TestWaylandClipboard:
 
     @patch("transcribe.wayland_clipboard.time")
     @patch("transcribe.wayland_clipboard.subprocess")
-    def test_restore_delay_is_200ms(self, mock_sub, mock_time):
+    def test_focus_settles_before_chord(self, mock_sub, mock_time):
+        # wl-copy/wl-paste pop focus-stealing transient surfaces on
+        # compositors without data-control; the chord must not be
+        # injected until focus has returned to the target app.
+        mock_sub.run.return_value.returncode = 1
+        mock_sub.run.return_value.stdout = b""
+        cb = self._make_clipboard()
+        cb.paste_text("text")
+        first_sleep = mock_time.sleep.call_args_list[0][0][0]
+        assert first_sleep >= 0.3
+
+    @patch("transcribe.wayland_clipboard.time")
+    @patch("transcribe.wayland_clipboard.subprocess")
+    def test_safety_release_after_chord(self, mock_sub, mock_time):
+        # If focus churn makes the app believe V is still held, its
+        # key repeat pastes forever. A release-only injection after
+        # the chord guarantees every app sees V and Ctrl go up.
+        mock_sub.run.return_value.returncode = 1
+        mock_sub.run.return_value.stdout = b""
+        cb = self._make_clipboard()
+        cb.paste_text("text")
+        ydotool_calls = [
+            c[0][0]
+            for c in mock_sub.run.call_args_list
+            if c[0][0][0] == "ydotool"
+        ]
+        chord_idx = next(
+            i for i, cmd in enumerate(ydotool_calls) if "47:1" in cmd
+        )
+        after_chord = ydotool_calls[chord_idx + 1 :]
+        assert any(
+            "47:0" in cmd and "29:0" in cmd and "47:1" not in cmd
+            for cmd in after_chord
+        )
+
+    @patch("transcribe.wayland_clipboard.time")
+    @patch("transcribe.wayland_clipboard.subprocess")
+    def test_restore_waits_for_paste_completion(self, mock_sub, mock_time):
         def run_side_effect(cmd, **kwargs):
             result = MagicMock(returncode=0)
             if "--list-types" in cmd:
@@ -148,6 +185,8 @@ class TestWaylandClipboard:
         mock_sub.run.side_effect = run_side_effect
         cb = self._make_clipboard()
         cb.paste_text("text")
-        sleep_calls = mock_time.sleep.call_args_list
-        # Second sleep (before restore) should be 0.2
-        assert sleep_calls[1] == call(0.2)
+        # The sleep immediately before the restoring wl-copy must be
+        # generous: restoring pops another transient surface, which
+        # must not overlap the app's paste handling.
+        last_sleep = mock_time.sleep.call_args_list[-1][0][0]
+        assert last_sleep >= 0.5

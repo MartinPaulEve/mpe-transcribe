@@ -48,8 +48,18 @@ class WaylandClipboard:
         )
 
     def paste_text(self, text: str):
+        # On compositors without the data-control protocol (GNOME),
+        # every wl-copy/wl-paste below pops a transient surface that
+        # briefly steals keyboard focus. If that churn overlaps the
+        # injected chord, the target app can miss the V release and
+        # its client-side key repeat pastes again (or forever). The
+        # sequence therefore isolates the chord from all clipboard
+        # operations and always re-releases the keys afterwards.
         previous = self._get_clipboard()
         self._set_clipboard(text)
+        # Let focus return to the target app after the wl-copy
+        # transient before any key event is sent.
+        time.sleep(0.35)
         # Release any ghost modifiers from the hotkey
         subprocess.run(
             [
@@ -63,9 +73,8 @@ class WaylandClipboard:
             check=False,
         )
         time.sleep(0.05)
-        # Simulate Ctrl+V. Space the key events at human typing
-        # speed: some Wayland apps double-process a synthetic chord
-        # whose press/release arrive sub-millisecond apart.
+        # Simulate Ctrl+V at human typing speed: sub-millisecond
+        # synthetic chords can be double-processed by some apps.
         subprocess.run(
             [
                 "ydotool",
@@ -79,6 +88,20 @@ class WaylandClipboard:
             ],
             check=True,
         )
-        time.sleep(0.2)
+        time.sleep(0.15)
+        # Safety release: guarantee every surface sees V and Ctrl go
+        # up, cancelling any phantom-held key before repeat starts.
+        subprocess.run(
+            [
+                "ydotool",
+                "key",
+                f"{_KEY_V}:0",
+                f"{_KEY_LEFTCTRL}:0",
+            ],
+            check=False,
+        )
+        # Let the app finish reading the clipboard before the restore
+        # pops another focus-stealing transient.
+        time.sleep(0.5)
         if previous is not None:
             self._restore_clipboard(previous)
