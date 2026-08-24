@@ -1,3 +1,16 @@
+## 1.7.0 (2026-08-22)
+
+### Feat
+
+- **scripts**: client-only install/uninstall + service unit
+- **cli**: add `transcribe keygen`
+- **app**: dispatch standalone/host/client; wire triggers + paste + state
+- **net**: UDP Client with trigger, register/renew/ack, reassembly
+- **net**: UDP Host with registry, session control + retransmit (host.py)
+- **net**: AEAD seal/open, replay + freshness guards (crypto.py) with tests
+- **net**: wire protocol framing + chunking (protocol.py) with tests
+- **config**: parse [tool.transcribe.network] and resolve the PSK
+
 ## 1.6.0 (2026-04-04)
 
 ### Feat
