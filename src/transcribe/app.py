@@ -140,7 +140,9 @@ class TranscribeApp:
             self._state = AppState.IDLE
             return
         self._state = AppState.TRANSCRIBING
-        self._notifier.notify_and_ding("Transcribe", "Transcribing...")
+        self._notifier.notify_and_ding(
+            "Transcribe", "Stopped — transcribing..."
+        )
         logger.info("Recording stopped, transcribing...")
         thread = threading.Thread(target=self._do_transcribe, args=(audio,))
         thread.daemon = True
@@ -302,7 +304,9 @@ class HostApp:
             )
             self.host.finish_session()
             return
-        self._notifier.notify_and_ding("Transcribe", "Transcribing...")
+        self._notifier.notify_and_ding(
+            "Transcribe", "Stopped — transcribing..."
+        )
         local = self.host.initiator_addr is None
         thread = threading.Thread(
             target=self._do_transcribe, args=(audio, local)
@@ -358,8 +362,7 @@ class HostApp:
             self._network["bind_port"],
         )
         logger.info(
-            "Host flags: also_paste_locally=%s host_hotkey=%s "
-            "deliver_to=%s",
+            "Host flags: also_paste_locally=%s host_hotkey=%s deliver_to=%s",
             self._network["also_paste_locally"],
             self._network["host_hotkey"],
             self._network["deliver_to"],
@@ -444,7 +447,9 @@ class ClientApp:
         if state == "recording":
             self._notifier.notify_and_ding("Transcribe", "Recording...")
         elif state == "transcribing":
-            self._notifier.notify_and_ding("Transcribe", "Transcribing...")
+            self._notifier.notify_and_ding(
+                "Transcribe", "Stopped — transcribing..."
+            )
         elif state == "error":
             self._notifier.notify("Transcribe", "Transcription error")
 

@@ -15,7 +15,7 @@ NETWORK_DEFAULTS = {
     "also_paste_locally": False,
     "host_hotkey": False,
     "subscriber_ttl": 30,
-    "max_record_seconds": 60,
+    "max_record_seconds": 300,
     "deliver_to": "initiator",
     "allowed_clients": None,
     "server_host": "127.0.0.1",

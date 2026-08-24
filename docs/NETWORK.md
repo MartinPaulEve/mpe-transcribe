@@ -125,7 +125,7 @@ All keys live in `[network]` in `transcribe.toml`. Every key is optional; the de
 | `also_paste_locally` | `false` | Host also pastes the text into its own focused window |
 | `host_hotkey` | `false` | The host user can trigger recordings locally with the hotkey too |
 | `subscriber_ttl` | `30` | Seconds after which a silent client is pruned from the registry |
-| `max_record_seconds` | `60` | Lost-STOP safeguard: auto-stop a recording after this long |
+| `max_record_seconds` | `300` | Lost-STOP safeguard: auto-stop a recording after this long |
 | `deliver_to` | `"initiator"` | `"initiator"` sends TEXT only to the client that started the session; `"all"` broadcasts it to every subscriber |
 | `allowed_clients` | (unset) | Optional list of `client_label` values allowed to trigger; unset = any client with the key |
 
@@ -167,7 +167,7 @@ mode = "host"
 # host_hotkey = false            # allow triggering from the host's own hotkey
 # deliver_to = "initiator"       # or "all" to broadcast text to every client
 # allowed_clients = ["nixos-vm"] # restrict who may trigger
-# max_record_seconds = 60
+# max_record_seconds = 300
 key_file = "~/.config/transcribe/psk.key"
 ```
 
