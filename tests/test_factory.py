@@ -120,6 +120,11 @@ class TestFactory:
         n = create_notifier()
         assert isinstance(n, WindowsNotifier)
 
+    @patch("transcribe.factory.detect_session", return_value="wayland")
+    def test_create_clipboard_wayland_paste_method(self, mock_detect):
+        cb = create_clipboard(paste_method="type")
+        assert cb._paste_method == "type"
+
     @patch("transcribe.factory.detect_session", return_value="x11")
     def test_create_notifier_visual_off_silences_notify(self, mock_detect):
         n = create_notifier(visual=False)

@@ -35,13 +35,14 @@ sudo apt install libportaudio2 xdotool xclip libnotify-bin
 Wayland support is experimental and has not been tested in production. If you are running a Wayland session (e.g. Ubuntu 24.04+ defaults to Wayland on GNOME), the app will auto-detect it and use the Wayland backend. You will need different system packages:
 
 ```bash
-sudo apt install libportaudio2 wl-clipboard ydotool libnotify-bin
+sudo apt install libportaudio2 xclip wl-clipboard ydotool libnotify-bin
 ```
 
 | Package | Purpose |
 |---|---|
 | `libportaudio2` | Audio I/O backend for `sounddevice` |
-| `wl-clipboard` | Provides `wl-copy`/`wl-paste` for Wayland clipboard access |
+| `xclip` | Preferred clipboard access via the XWayland bridge — X11 selections need no keyboard focus, so no transient surfaces disturb the paste (important on GNOME, which withholds the data-control protocol) |
+| `wl-clipboard` | Provides `wl-copy`/`wl-paste` — fallback when `xclip` or XWayland is unavailable |
 | `ydotool` | Simulates key release and Ctrl+V paste via the kernel input layer |
 | `libnotify-bin` | Provides `notify-send` for desktop notifications |
 

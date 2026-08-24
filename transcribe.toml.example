@@ -55,6 +55,17 @@
 # threshold = 0.8
 
 # ---------------------------------------------------------------
+# Paste method (Wayland sessions)
+# ---------------------------------------------------------------
+# "ctrl+v" (default): put the text on the clipboard and inject a
+#          Ctrl+V chord. Uses xclip via the XWayland bridge when
+#          available (no focus-stealing transient surfaces).
+# "type":  type the text directly via ydotool — no clipboard, no
+#          Ctrl+V. Slower for long texts, but immune to any
+#          synthetic-paste misbehaviour.
+# paste_method = "ctrl+v"
+
+# ---------------------------------------------------------------
 # Notifications
 # ---------------------------------------------------------------
 # Each channel can be turned off independently. Defaults: all on.

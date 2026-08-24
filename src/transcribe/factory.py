@@ -32,7 +32,7 @@ def create_hotkey_listener(callback, modifiers: set[str], key: str):
         return HotkeyListener(callback, modifiers=modifiers, key=key)
 
 
-def create_clipboard():
+def create_clipboard(paste_method: str = "ctrl+v"):
     """Create a clipboard handler for the current session type."""
     session = detect_session()
     if session == "macos":
@@ -46,7 +46,7 @@ def create_clipboard():
     elif session == "wayland":
         from transcribe.wayland_clipboard import WaylandClipboard
 
-        return WaylandClipboard()
+        return WaylandClipboard(paste_method=paste_method)
     else:
         from transcribe.clipboard import Clipboard
 

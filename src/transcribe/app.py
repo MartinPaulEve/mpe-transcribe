@@ -84,7 +84,9 @@ class TranscribeApp:
         )
         notifications = self._config.get("notifications", {})
         self._notifier = create_notifier(**notifications)
-        self._clipboard = create_clipboard()
+        self._clipboard = create_clipboard(
+            paste_method=self._config.get("paste_method", "ctrl+v")
+        )
         self._lock = threading.Lock()
         self._stop_event = threading.Event()
 
@@ -236,7 +238,9 @@ class HostApp:
         self._notifier = create_notifier(**notifications)
         self._clipboard = None
         if self._network["also_paste_locally"] or self._network["host_hotkey"]:
-            self._clipboard = create_clipboard()
+            self._clipboard = create_clipboard(
+                paste_method=self._config.get("paste_method", "ctrl+v")
+            )
         if transport is None:
             from transcribe.net.transport import UdpTransport
 
@@ -412,7 +416,9 @@ class ClientApp:
         )
         notifications = self._config.get("notifications", {})
         self._notifier = create_notifier(**notifications)
-        self._clipboard = create_clipboard()
+        self._clipboard = create_clipboard(
+            paste_method=self._config.get("paste_method", "ctrl+v")
+        )
         self._lock = threading.Lock()
         self._stop_event = threading.Event()
 

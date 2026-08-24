@@ -125,6 +125,22 @@ class TestLoadConfig:
         config = load_config(root=tmp_path)
         assert config["notifications"] == {"visual": True, "sound": False}
 
+    def test_paste_method_defaults_to_ctrl_v(self, tmp_path):
+        config = load_config(root=tmp_path)
+        assert config["paste_method"] == "ctrl+v"
+
+    def test_paste_method_type_accepted(self, tmp_path):
+        (tmp_path / "transcribe.toml").write_text('paste_method = "type"\n')
+        config = load_config(root=tmp_path)
+        assert config["paste_method"] == "type"
+
+    def test_paste_method_invalid_raises(self, tmp_path):
+        (tmp_path / "transcribe.toml").write_text(
+            'paste_method = "telepathy"\n'
+        )
+        with pytest.raises(ConfigError, match="paste_method"):
+            load_config(root=tmp_path)
+
     def test_transcribe_toml_wins_over_pyproject(self, tmp_path):
         (tmp_path / "pyproject.toml").write_text(
             "[tool.transcribe]\n"

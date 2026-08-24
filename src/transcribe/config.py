@@ -143,7 +143,13 @@ def load_config(root: Path | None = None) -> dict:
     section = _load_user_section(root)
     custom_terms_section = section.get("custom_terms", {})
     notifications = section.get("notifications", {})
+    paste_method = section.get("paste_method", "ctrl+v")
+    if paste_method not in ("ctrl+v", "type"):
+        raise ConfigError(
+            f"invalid paste_method: {paste_method!r} (expected ctrl+v or type)"
+        )
     return {
+        "paste_method": paste_method,
         "model": section.get("model", _default_model()),
         "hotkey": section.get("hotkey", _default_hotkey()),
         "replacements": section.get("replacements", {}),
