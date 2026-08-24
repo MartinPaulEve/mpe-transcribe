@@ -326,6 +326,12 @@ class HostApp:
                     if self._clipboard is not None and (
                         local or self._network["also_paste_locally"]
                     ):
+                        logger.info(
+                            "Pasting locally on the host too "
+                            "(local=%s also_paste_locally=%s)",
+                            local,
+                            self._network["also_paste_locally"],
+                        )
                         self._clipboard.paste_text(text)
                 self._notifier.notify("Transcribe", "Sent!")
             else:
@@ -350,6 +356,13 @@ class HostApp:
             "Host mode: listening on %s:%d",
             self._network["bind_host"],
             self._network["bind_port"],
+        )
+        logger.info(
+            "Host flags: also_paste_locally=%s host_hotkey=%s "
+            "deliver_to=%s",
+            self._network["also_paste_locally"],
+            self._network["host_hotkey"],
+            self._network["deliver_to"],
         )
         _warn_if_macos_untrusted()
         logger.info("Loading model...")
