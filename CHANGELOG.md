@@ -1,3 +1,17 @@
+## 1.8.0 (2026-08-24)
+
+### Feat
+
+- **host**: log effective host flags and local-paste decisions
+- **config**: reject unknown and misplaced config keys
+- **config**: transcribe.toml user config; notifier hardening + toggles
+
+### Fix
+
+- **wayland**: xclip clipboard via XWayland bridge + paste_method=type escape hatch
+- **wayland**: isolate paste chord from clipboard focus churn
+- **wayland**: inject Ctrl+V at human speed to avoid app double-paste
+
 ## 1.7.0 (2026-08-22)
 
 ### Feat
