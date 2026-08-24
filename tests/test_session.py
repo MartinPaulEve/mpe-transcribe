@@ -20,20 +20,49 @@ class TestDetectSession:
     def test_wayland_display_fallback(self):
         assert detect_session() == "wayland"
 
+    @patch("transcribe.session.os.listdir", return_value=[])
     @patch.dict(
         "os.environ",
         {"XDG_SESSION_TYPE": "", "WAYLAND_DISPLAY": ""},
         clear=False,
     )
-    def test_defaults_to_x11(self):
+    def test_defaults_to_x11_without_wayland_socket(self, mock_listdir):
         assert detect_session() == "x11"
 
+    @patch("transcribe.session.os.listdir", return_value=[])
     @patch.dict(
         "os.environ",
         {},
         clear=True,
     )
-    def test_no_env_vars_defaults_to_x11(self):
+    def test_no_env_vars_defaults_to_x11(self, mock_listdir):
+        assert detect_session() == "x11"
+
+    @patch(
+        "transcribe.session.os.listdir",
+        return_value=["wayland-0", "wayland-0.lock", "bus"],
+    )
+    @patch.dict("os.environ", {}, clear=True)
+    def test_wayland_socket_detected_despite_stripped_env(self, mock_listdir):
+        # tmux/byobu panes often carry a stale environment with no
+        # XDG_SESSION_TYPE or WAYLAND_DISPLAY; the live compositor
+        # socket in XDG_RUNTIME_DIR is the ground truth.
+        assert detect_session() == "wayland"
+
+    @patch(
+        "transcribe.session.os.listdir",
+        return_value=["wayland-0", "bus"],
+    )
+    @patch.dict("os.environ", {"XDG_SESSION_TYPE": "x11"}, clear=True)
+    def test_explicit_x11_env_wins_over_socket(self, mock_listdir):
+        assert detect_session() == "x11"
+
+    @patch(
+        "transcribe.session.os.listdir",
+        side_effect=OSError("no runtime dir"),
+    )
+    @patch.dict("os.environ", {}, clear=True)
+    def test_unreadable_runtime_dir_defaults_to_x11(self, mock_listdir):
         assert detect_session() == "x11"
 
     @patch("transcribe.session.platform.system", return_value="Darwin")

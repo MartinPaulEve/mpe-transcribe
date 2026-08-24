@@ -466,6 +466,12 @@ class ClientApp:
             self._network["server_port"],
             self._config["hotkey"],
         )
+        logger.info(
+            "Session: %s; hotkey listener: %s; clipboard: %s",
+            detect_session(),
+            type(self._hotkey).__name__,
+            type(self._clipboard).__name__,
+        )
         self._notifier.notify_and_ding("Transcribe", "Ready")
         with self._lock:
             self.client.start()
