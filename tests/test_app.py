@@ -3,7 +3,9 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 
+from tests.test_notifier import RecordingNotifier
 from transcribe.app import AppState, TranscribeApp
+from transcribe.notifier import FilteredNotifier
 
 
 class TestApp:
@@ -124,7 +126,7 @@ class TestApp:
         assert app.state == AppState.IDLE
         mock_trans.transcribe.assert_not_called()
         mock_notif.notify.assert_called_once_with(
-            "Transcribe", "Recording too short"
+            "Transcribe", "Recording too short", event="error"
         )
 
     def test_silent_audio_returns_to_idle(self):
@@ -140,6 +142,7 @@ class TestApp:
         mock_notif.notify.assert_called_once_with(
             "Transcribe",
             "No audio detected — check mic permissions",
+            event="error",
         )
 
     def test_recording_error_returns_to_idle(self):
@@ -150,7 +153,7 @@ class TestApp:
 
         assert app.state == AppState.IDLE
         mock_notif.notify.assert_called_once_with(
-            "Transcribe", "Mic error — see logs"
+            "Transcribe", "Mic error — see logs", event="error"
         )
 
     def test_run_notifies_when_ready(self):
@@ -163,7 +166,7 @@ class TestApp:
 
         mock_trans.load_model.assert_called_once()
         mock_notif.notify_and_ding.assert_called_once_with(
-            "Transcribe", "Ready"
+            "Transcribe", "Ready", event="ready"
         )
 
     def test_shutdown_stops_hotkey(self):
@@ -244,3 +247,80 @@ class TestApp:
             mock_cb.paste_text.assert_called_once_with(
                 "push the commit to main"
             )
+
+
+class TestAppEventNotifications:
+    """Per-event flags silence app notifications end to end."""
+
+    TEST_CONFIG = TestApp.TEST_CONFIG
+
+    def _make_app(self, events):
+        inner = RecordingNotifier()
+        notifier = FilteredNotifier(inner, events=events)
+        mock_hk = MagicMock()
+        mock_cb = MagicMock()
+        mock_trans = MagicMock()
+        with (
+            patch("transcribe.recorder.AudioRecorder") as mock_rec_cls,
+            patch(
+                "transcribe.app.create_transcriber",
+                return_value=mock_trans,
+            ),
+            patch(
+                "transcribe.app.create_hotkey_listener",
+                return_value=mock_hk,
+            ),
+            patch(
+                "transcribe.app.create_notifier",
+                return_value=notifier,
+            ),
+            patch(
+                "transcribe.app.create_clipboard",
+                return_value=mock_cb,
+            ),
+        ):
+            app = TranscribeApp(config=self.TEST_CONFIG)
+            return (
+                app,
+                mock_rec_cls.return_value,
+                mock_trans,
+                mock_cb,
+                inner,
+            )
+
+    def test_recording_event_off_suppresses_start_notification(self):
+        app, _, _, _, inner = self._make_app({"recording": False})
+        app.toggle()
+        assert app.state == AppState.RECORDING
+        assert inner.notifications == []
+        assert inner.dings == 0
+
+    def test_ready_event_off_suppresses_startup_notification(self):
+        app, _, _, _, inner = self._make_app({"ready": False})
+        app._stop_event.set()
+        with patch("transcribe.app.signal"):
+            app.run()
+        assert inner.notifications == []
+        assert inner.dings == 0
+
+    def test_error_event_off_suppresses_too_short_warning(self):
+        app, mock_rec, _, _, inner = self._make_app({"error": False})
+        mock_rec.stop.return_value = np.array([], dtype=np.float32)
+        app.toggle()  # IDLE -> RECORDING
+        seen = len(inner.notifications)
+        app.toggle()  # RECORDING -> IDLE (too short)
+        assert app.state == AppState.IDLE
+        assert len(inner.notifications) == seen
+
+    def test_pasted_event_off_still_pastes_text(self):
+        app, mock_rec, mock_trans, mock_cb, inner = self._make_app(
+            {"recording": False, "stopped": False, "pasted": False}
+        )
+        mock_rec.stop.return_value = np.ones(16000, dtype=np.float32)
+        mock_trans.transcribe.return_value = "hello"
+        app.toggle()
+        app.toggle()
+        time.sleep(0.1)
+        mock_cb.paste_text.assert_called_once_with("hello")
+        assert inner.notifications == []
+        assert inner.dings == 0

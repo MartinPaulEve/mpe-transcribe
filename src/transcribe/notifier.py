@@ -5,24 +5,40 @@ logger = logging.getLogger(__name__)
 
 
 class FilteredNotifier:
-    """Wraps a platform notifier, silencing disabled channels."""
+    """Wraps a platform notifier, silencing disabled channels.
 
-    def __init__(self, inner, visual: bool = True, sound: bool = True):
+    The master switches (visual/sound) silence one channel for
+    every event; a per-event flag set to False silences both
+    channels for that event. Untagged calls (event=None) are
+    governed by the masters alone.
+    """
+
+    def __init__(
+        self,
+        inner,
+        visual: bool = True,
+        sound: bool = True,
+        events: dict | None = None,
+    ):
         self._inner = inner
         self._visual = visual
         self._sound = sound
+        self._events = dict(events or {})
 
-    def notify(self, title: str, body: str):
-        if self._visual:
+    def _event_on(self, event: str | None) -> bool:
+        return event is None or self._events.get(event, True)
+
+    def notify(self, title: str, body: str, event: str | None = None):
+        if self._visual and self._event_on(event):
             self._inner.notify(title, body)
 
-    def ding(self):
-        if self._sound:
+    def ding(self, event: str | None = None):
+        if self._sound and self._event_on(event):
             self._inner.ding()
 
-    def notify_and_ding(self, title: str, body: str):
-        self.notify(title, body)
-        self.ding()
+    def notify_and_ding(self, title: str, body: str, event: str | None = None):
+        self.notify(title, body, event=event)
+        self.ding(event=event)
 
 
 class AppNotifier:

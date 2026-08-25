@@ -109,21 +109,66 @@ class TestLoadConfig:
 
     def test_notifications_default_all_on(self, tmp_path):
         config = load_config(root=tmp_path)
-        assert config["notifications"] == {"visual": True, "sound": True}
+        assert config["notifications"]["visual"] is True
+        assert config["notifications"]["sound"] is True
 
     def test_notifications_section_disables_channels(self, tmp_path):
         (tmp_path / "transcribe.toml").write_text(
             "[notifications]\nvisual = false\nsound = false\n"
         )
         config = load_config(root=tmp_path)
-        assert config["notifications"] == {"visual": False, "sound": False}
+        assert config["notifications"]["visual"] is False
+        assert config["notifications"]["sound"] is False
 
     def test_notifications_partial_section(self, tmp_path):
         (tmp_path / "transcribe.toml").write_text(
             "[notifications]\nsound = false\n"
         )
         config = load_config(root=tmp_path)
-        assert config["notifications"] == {"visual": True, "sound": False}
+        assert config["notifications"]["visual"] is True
+        assert config["notifications"]["sound"] is False
+
+    def test_notifications_events_default_all_on(self, tmp_path):
+        config = load_config(root=tmp_path)
+        assert config["notifications"]["events"] == {
+            "ready": True,
+            "recording": True,
+            "stopped": True,
+            "pasted": True,
+            "error": True,
+        }
+
+    def test_notifications_events_section_disables_events(self, tmp_path):
+        (tmp_path / "transcribe.toml").write_text(
+            "[notifications.events]\nrecording = false\npasted = false\n"
+        )
+        config = load_config(root=tmp_path)
+        events = config["notifications"]["events"]
+        assert events["recording"] is False
+        assert events["pasted"] is False
+        assert events["ready"] is True
+        assert events["stopped"] is True
+        assert events["error"] is True
+
+    def test_notifications_events_compose_with_masters(self, tmp_path):
+        (tmp_path / "transcribe.toml").write_text(
+            "[notifications]\n"
+            "sound = false\n"
+            "[notifications.events]\n"
+            "ready = false\n"
+        )
+        config = load_config(root=tmp_path)
+        assert config["notifications"]["visual"] is True
+        assert config["notifications"]["sound"] is False
+        assert config["notifications"]["events"]["ready"] is False
+        assert config["notifications"]["events"]["error"] is True
+
+    def test_unknown_key_in_notifications_events_raises(self, tmp_path):
+        (tmp_path / "transcribe.toml").write_text(
+            "[notifications.events]\npasetd = false\n"
+        )
+        with pytest.raises(ConfigError, match="pasetd"):
+            load_config(root=tmp_path)
 
     def test_paste_method_defaults_to_ctrl_v(self, tmp_path):
         config = load_config(root=tmp_path)

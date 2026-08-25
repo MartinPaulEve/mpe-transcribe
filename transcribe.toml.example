@@ -78,6 +78,17 @@
 # visual = true   # desktop notifications (Recording/Transcribing/Pasted)
 # sound = true    # the ding on state changes
 
+# Individual events can also be silenced. Setting an event to
+# false suppresses both its notification and its ding; the master
+# switches above still apply on top. Defaults: all on.
+# [notifications.events]
+# ready = true        # startup "Ready"
+# recording = true    # "Recording..."
+# stopped = true      # "Stopped — transcribing..."
+# pasted = true       # "Pasted!" on the client / "Sent!" on the host
+# error = true        # errors and warnings (mic errors, too short,
+#                     # silent recording, no speech, transcription error)
+
 # ---------------------------------------------------------------
 # Network (host/client mode)
 # ---------------------------------------------------------------

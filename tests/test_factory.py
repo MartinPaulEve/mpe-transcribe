@@ -153,3 +153,29 @@ class TestFactory:
             n.notify_and_ding("T", "B")
         mock_run.assert_not_called()
         mock_sd.play.assert_called_once()
+
+    @patch("transcribe.factory.detect_session", return_value="x11")
+    def test_create_notifier_event_off_silences_both(self, mock_detect):
+        import sys
+
+        mock_sd = sys.modules["sounddevice"]
+        mock_sd.reset_mock()
+        n = create_notifier(events={"recording": False})
+        with patch("transcribe.notifier.subprocess.run") as mock_run:
+            n.notify_and_ding("T", "B", event="recording")
+        mock_run.assert_not_called()
+        mock_sd.play.assert_not_called()
+
+    @patch("transcribe.factory.detect_session", return_value="x11")
+    def test_create_notifier_events_accept_event_kwarg(self, mock_detect):
+        # Even with every event enabled, the returned notifier must
+        # accept event-tagged calls from the app.
+        import sys
+
+        mock_sd = sys.modules["sounddevice"]
+        mock_sd.reset_mock()
+        n = create_notifier(events={"ready": True})
+        with patch("transcribe.notifier.subprocess.run") as mock_run:
+            n.notify_and_ding("T", "B", event="ready")
+        mock_run.assert_called_once()
+        mock_sd.play.assert_called_once()

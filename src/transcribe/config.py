@@ -151,8 +151,10 @@ _KNOWN_TOP_LEVEL_KEYS = frozenset(
 
 _KNOWN_SECTION_KEYS = {
     "custom_terms": frozenset({"terms", "threshold"}),
-    "notifications": frozenset({"visual", "sound"}),
+    "notifications": frozenset({"visual", "sound", "events"}),
 }
+
+NOTIFICATION_EVENTS = ("ready", "recording", "stopped", "pasted", "error")
 
 
 def _reject_unknown_keys(section: dict) -> None:
@@ -177,6 +179,16 @@ def _reject_unknown_keys(section: dict) -> None:
                 + " (top-level keys must appear above the first "
                 "[section] header)"
             )
+    notifications = section.get("notifications")
+    if isinstance(notifications, dict):
+        events = notifications.get("events")
+        if isinstance(events, dict):
+            unknown = set(events) - set(NOTIFICATION_EVENTS)
+            if unknown:
+                raise ConfigError(
+                    "unknown [notifications.events] keys: "
+                    + ", ".join(sorted(unknown))
+                )
 
 
 def load_config(root: Path | None = None) -> dict:
@@ -186,6 +198,7 @@ def load_config(root: Path | None = None) -> dict:
     _reject_unknown_keys(section)
     custom_terms_section = section.get("custom_terms", {})
     notifications = section.get("notifications", {})
+    notification_events = notifications.get("events", {})
     paste_method = section.get("paste_method", "ctrl+v")
     if paste_method not in ("ctrl+v", "type"):
         raise ConfigError(
@@ -201,6 +214,10 @@ def load_config(root: Path | None = None) -> dict:
         "notifications": {
             "visual": bool(notifications.get("visual", True)),
             "sound": bool(notifications.get("sound", True)),
+            "events": {
+                name: bool(notification_events.get(name, True))
+                for name in NOTIFICATION_EVENTS
+            },
         },
         "network": load_network_config(section.get("network")),
     }

@@ -104,7 +104,11 @@ class TranscribeApp:
                         "Failed to start recording. %s",
                         _PORTAUDIO_HINT,
                     )
-                    self._notifier.notify("Transcribe", "Mic error — see logs")
+                    self._notifier.notify(
+                        "Transcribe",
+                        "Mic error — see logs",
+                        event="error",
+                    )
                     self._state = AppState.IDLE
             elif self._state == AppState.RECORDING:
                 self._stop_and_transcribe()
@@ -113,10 +117,12 @@ class TranscribeApp:
         ok, msg = check_default_input_device()
         if not ok:
             logger.error("Device check failed: %s", msg)
-            self._notifier.notify("Transcribe", msg)
+            self._notifier.notify("Transcribe", msg, event="error")
             self._state = AppState.IDLE
             return
-        self._notifier.notify_and_ding("Transcribe", "Recording...")
+        self._notifier.notify_and_ding(
+            "Transcribe", "Recording...", event="recording"
+        )
         self._recorder.start()
         self._state = AppState.RECORDING
         logger.info("Recording started")
@@ -129,19 +135,22 @@ class TranscribeApp:
             len(audio) / 16000,
         )
         if len(audio) == 0:
-            self._notifier.notify("Transcribe", "Recording too short")
+            self._notifier.notify(
+                "Transcribe", "Recording too short", event="error"
+            )
             self._state = AppState.IDLE
             return
         if _is_silent(audio):
             self._notifier.notify(
                 "Transcribe",
                 "No audio detected — check mic permissions",
+                event="error",
             )
             self._state = AppState.IDLE
             return
         self._state = AppState.TRANSCRIBING
         self._notifier.notify_and_ding(
-            "Transcribe", "Stopped — transcribing..."
+            "Transcribe", "Stopped — transcribing...", event="stopped"
         )
         logger.info("Recording stopped, transcribing...")
         thread = threading.Thread(target=self._do_transcribe, args=(audio,))
@@ -167,12 +176,16 @@ class TranscribeApp:
                     )
             if text:
                 self._clipboard.paste_text(text)
-                self._notifier.notify("Transcribe", "Pasted!")
+                self._notifier.notify("Transcribe", "Pasted!", event="pasted")
             else:
-                self._notifier.notify("Transcribe", "No speech detected")
+                self._notifier.notify(
+                    "Transcribe", "No speech detected", event="error"
+                )
         except Exception:
             logger.exception("Transcription failed")
-            self._notifier.notify("Transcribe", "Transcription error")
+            self._notifier.notify(
+                "Transcribe", "Transcription error", event="error"
+            )
         finally:
             self._state = AppState.IDLE
 
@@ -188,7 +201,7 @@ class TranscribeApp:
 
         logger.info("Loading model...")
         self._transcriber.load_model()
-        self._notifier.notify_and_ding("Transcribe", "Ready")
+        self._notifier.notify_and_ding("Transcribe", "Ready", event="ready")
         logger.info(
             "Ready. Press %s to toggle recording. Ctrl+C to quit.",
             self._config["hotkey"],
@@ -280,9 +293,11 @@ class HostApp:
         ok, msg = check_default_input_device()
         if not ok:
             logger.error("Device check failed: %s", msg)
-            self._notifier.notify("Transcribe", msg)
+            self._notifier.notify("Transcribe", msg, event="error")
             raise RuntimeError(msg)
-        self._notifier.notify_and_ding("Transcribe", "Recording...")
+        self._notifier.notify_and_ding(
+            "Transcribe", "Recording...", event="recording"
+        )
         self._recorder.start()
         logger.info("Recording started")
 
@@ -294,18 +309,21 @@ class HostApp:
             len(audio) / 16000,
         )
         if len(audio) == 0:
-            self._notifier.notify("Transcribe", "Recording too short")
+            self._notifier.notify(
+                "Transcribe", "Recording too short", event="error"
+            )
             self.host.finish_session()
             return
         if _is_silent(audio):
             self._notifier.notify(
                 "Transcribe",
                 "No audio detected — check mic permissions",
+                event="error",
             )
             self.host.finish_session()
             return
         self._notifier.notify_and_ding(
-            "Transcribe", "Stopped — transcribing..."
+            "Transcribe", "Stopped — transcribing...", event="stopped"
         )
         local = self.host.initiator_addr is None
         thread = threading.Thread(
@@ -337,12 +355,16 @@ class HostApp:
                             self._network["also_paste_locally"],
                         )
                         self._clipboard.paste_text(text)
-                self._notifier.notify("Transcribe", "Sent!")
+                self._notifier.notify("Transcribe", "Sent!", event="pasted")
             else:
-                self._notifier.notify("Transcribe", "No speech detected")
+                self._notifier.notify(
+                    "Transcribe", "No speech detected", event="error"
+                )
         except Exception:
             logger.exception("Transcription failed")
-            self._notifier.notify("Transcribe", "Transcription error")
+            self._notifier.notify(
+                "Transcribe", "Transcription error", event="error"
+            )
             with self._lock:
                 self.host.publish_state("error")
         finally:
@@ -370,7 +392,7 @@ class HostApp:
         _warn_if_macos_untrusted()
         logger.info("Loading model...")
         self._transcriber.load_model()
-        self._notifier.notify_and_ding("Transcribe", "Ready")
+        self._notifier.notify_and_ding("Transcribe", "Ready", event="ready")
         if self._hotkey is not None:
             self._hotkey.start()
 
@@ -445,19 +467,23 @@ class ClientApp:
     def _on_state(self, body: dict):
         state = body.get("state")
         if state == "recording":
-            self._notifier.notify_and_ding("Transcribe", "Recording...")
+            self._notifier.notify_and_ding(
+                "Transcribe", "Recording...", event="recording"
+            )
         elif state == "transcribing":
             self._notifier.notify_and_ding(
-                "Transcribe", "Stopped — transcribing..."
+                "Transcribe", "Stopped — transcribing...", event="stopped"
             )
         elif state == "error":
-            self._notifier.notify("Transcribe", "Transcription error")
+            self._notifier.notify(
+                "Transcribe", "Transcription error", event="error"
+            )
 
     def _on_text(self, text: str):
         logger.info("Text received (%d chars); pasting", len(text))
         self._clipboard.paste_text(text)
         logger.info("Paste complete")
-        self._notifier.notify("Transcribe", "Pasted!")
+        self._notifier.notify("Transcribe", "Pasted!", event="pasted")
 
     def run(self):
         logging.basicConfig(
@@ -477,7 +503,7 @@ class ClientApp:
             type(self._hotkey).__name__,
             type(self._clipboard).__name__,
         )
-        self._notifier.notify_and_ding("Transcribe", "Ready")
+        self._notifier.notify_and_ding("Transcribe", "Ready", event="ready")
         with self._lock:
             self.client.start()
         self._hotkey.start()

@@ -72,11 +72,16 @@ def create_transcriber(model_name: str, initial_prompt: str | None = None):
         return Transcriber(model_name=model_name)
 
 
-def create_notifier(visual: bool = True, sound: bool = True):
+def create_notifier(
+    visual: bool = True, sound: bool = True, events: dict | None = None
+):
     """Create a notifier for the current session type.
 
     Channels disabled in config ([notifications] visual/sound) are
-    silenced by wrapping the platform notifier.
+    silenced by wrapping the platform notifier; per-event flags
+    ([notifications.events]) silence both channels for one event.
+    When an events dict is given the wrapper is always used, so
+    event-tagged calls work even with every flag on.
     """
     session = detect_session()
     if session == "macos":
@@ -91,8 +96,10 @@ def create_notifier(visual: bool = True, sound: bool = True):
         from transcribe.notifier import AppNotifier
 
         notifier = AppNotifier()
-    if visual and sound:
+    if visual and sound and events is None:
         return notifier
     from transcribe.notifier import FilteredNotifier
 
-    return FilteredNotifier(notifier, visual=visual, sound=sound)
+    return FilteredNotifier(
+        notifier, visual=visual, sound=sound, events=events
+    )

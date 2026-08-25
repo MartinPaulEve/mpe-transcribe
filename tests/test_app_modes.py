@@ -6,9 +6,11 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
+from tests.test_notifier import RecordingNotifier
 from transcribe.app import ClientApp, HostApp, main
 from transcribe.config import NETWORK_DEFAULTS, ConfigError
 from transcribe.net import crypto, protocol
+from transcribe.notifier import FilteredNotifier
 
 PSK = b"\x07" * 32
 PSK_B64 = base64.b64encode(PSK).decode()
@@ -68,11 +70,11 @@ def sent_of_type(transport, msg_type, addr=None):
     return out
 
 
-def make_host_app(config=None, **net_overrides):
+def make_host_app(config=None, notifier=None, **net_overrides):
     config = config or make_config("host", **net_overrides)
     transport = FakeTransport()
     mock_trans = MagicMock()
-    mock_notif = MagicMock()
+    mock_notif = notifier if notifier is not None else MagicMock()
     mock_cb = MagicMock()
     mock_hk = MagicMock()
     with (
@@ -97,10 +99,10 @@ def make_host_app(config=None, **net_overrides):
     )
 
 
-def make_client_app(config=None, **net_overrides):
+def make_client_app(config=None, notifier=None, **net_overrides):
     config = config or make_config("client", **net_overrides)
     transport = FakeTransport()
-    mock_notif = MagicMock()
+    mock_notif = notifier if notifier is not None else MagicMock()
     mock_cb = MagicMock()
     mock_hk = MagicMock()
     with (
@@ -236,6 +238,30 @@ class TestHostApp:
         assert sent_of_type(transport, protocol.TYPE_TEXT) == []
         assert app.host.state == "idle"
 
+    def test_host_event_flags_silence_session_notifications(self, mock_check):
+        inner = RecordingNotifier()
+        notifier = FilteredNotifier(
+            inner,
+            events={
+                "recording": False,
+                "stopped": False,
+                "pasted": False,
+            },
+        )
+        app, transport, mock_rec, mock_trans, _, _, _ = make_host_app(
+            notifier=notifier
+        )
+        mock_rec.stop.return_value = np.ones(16000, dtype=np.float32)
+        mock_trans.transcribe.return_value = "hello world"
+        send_start(app)
+        send_stop(app)
+        time.sleep(0.2)
+        # text still reaches the client; only notifications are off
+        texts = sent_of_type(transport, protocol.TYPE_TEXT, CLIENT_ADDR)
+        assert len(texts) == 1
+        assert inner.notifications == []
+        assert inner.dings == 0
+
     def test_host_mode_without_key_refuses_to_start(self, mock_check):
         config = make_config("host")
         env = {k: v for k, v in os.environ.items() if k != "TRANSCRIBE_PSK"}
@@ -285,7 +311,39 @@ class TestClientApp:
                 seal_datagram(protocol.TYPE_TEXT, body), CLIENT_ADDR
             )
         mock_cb.paste_text.assert_called_once_with("dictated text")
-        mock_notif.notify.assert_called_with("Transcribe", "Pasted!")
+        mock_notif.notify.assert_called_with(
+            "Transcribe", "Pasted!", event="pasted"
+        )
+
+    def test_client_event_flags_silence_state_notifications(self):
+        inner = RecordingNotifier()
+        notifier = FilteredNotifier(
+            inner,
+            events={"recording": False, "stopped": False, "error": False},
+        )
+        app, _, _, _, _, _ = make_client_app(notifier=notifier)
+        for state in ("recording", "transcribing", "error"):
+            body = protocol.new_body(time.time(), state=state)
+            app.client.handle_datagram(
+                seal_datagram(protocol.TYPE_STATE, body), CLIENT_ADDR
+            )
+        assert inner.notifications == []
+        assert inner.dings == 0
+
+    def test_client_pasted_event_off_still_pastes(self):
+        inner = RecordingNotifier()
+        notifier = FilteredNotifier(inner, events={"pasted": False})
+        app, _, _, mock_cb, _, _ = make_client_app(notifier=notifier)
+        bodies = protocol.split_message(
+            "dictated text", "sess1", "msg1", time.time()
+        )
+        for body in bodies:
+            app.client.handle_datagram(
+                seal_datagram(protocol.TYPE_TEXT, body), CLIENT_ADDR
+            )
+        mock_cb.paste_text.assert_called_once_with("dictated text")
+        assert inner.notifications == []
+        assert inner.dings == 0
 
     def test_client_mode_without_key_refuses_to_start(self):
         config = make_config("client")

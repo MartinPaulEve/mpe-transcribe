@@ -126,3 +126,55 @@ class TestFilteredNotifier:
         filtered.ding()
         assert inner.notifications == []
         assert inner.dings == 0
+
+
+class TestFilteredNotifierEvents:
+    def test_disabled_event_silences_notify_and_ding(self):
+        inner = RecordingNotifier()
+        filtered = FilteredNotifier(inner, events={"recording": False})
+        filtered.notify_and_ding("T", "B", event="recording")
+        assert inner.notifications == []
+        assert inner.dings == 0
+
+    def test_disabled_event_silences_notify(self):
+        inner = RecordingNotifier()
+        filtered = FilteredNotifier(inner, events={"error": False})
+        filtered.notify("T", "B", event="error")
+        assert inner.notifications == []
+
+    def test_other_events_unaffected(self):
+        inner = RecordingNotifier()
+        filtered = FilteredNotifier(inner, events={"recording": False})
+        filtered.notify_and_ding("T", "B", event="ready")
+        assert inner.notifications == [("T", "B")]
+        assert inner.dings == 1
+
+    def test_unlisted_event_defaults_on(self):
+        inner = RecordingNotifier()
+        filtered = FilteredNotifier(inner, events={})
+        filtered.notify_and_ding("T", "B", event="pasted")
+        assert inner.notifications == [("T", "B")]
+        assert inner.dings == 1
+
+    def test_untagged_calls_ignore_event_flags(self):
+        inner = RecordingNotifier()
+        filtered = FilteredNotifier(inner, events={"ready": False})
+        filtered.notify_and_ding("T", "B")
+        assert inner.notifications == [("T", "B")]
+        assert inner.dings == 1
+
+    def test_master_visual_off_composes_with_event_on(self):
+        inner = RecordingNotifier()
+        filtered = FilteredNotifier(
+            inner, visual=False, events={"ready": True}
+        )
+        filtered.notify_and_ding("T", "B", event="ready")
+        assert inner.notifications == []
+        assert inner.dings == 1
+
+    def test_master_sound_off_composes_with_event_on(self):
+        inner = RecordingNotifier()
+        filtered = FilteredNotifier(inner, sound=False, events={"ready": True})
+        filtered.notify_and_ding("T", "B", event="ready")
+        assert inner.notifications == [("T", "B")]
+        assert inner.dings == 0
