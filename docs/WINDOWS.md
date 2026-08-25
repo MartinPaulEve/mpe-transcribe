@@ -22,24 +22,24 @@
 
 Download Python 3.12+ from [python.org](https://www.python.org/downloads/windows/) and ensure it's added to your PATH.
 
-Install uv:
+Install uv (see the [uv installation docs](https://docs.astral.sh/uv/getting-started/installation/)):
 
 ```powershell
-pip install uv
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
 ### 2. Clone and install
 
 ```powershell
-git clone <repo-url>
+git clone <repo-url> transcribe
 cd transcribe
-uv pip install -e ".[windows]"
+uv sync --extra windows
 ```
 
 ### 3. Verify CUDA
 
 ```powershell
-python -c "import torch; print(torch.cuda.is_available())"
+uv run python -c "import torch; print(torch.cuda.is_available())"
 ```
 
 This should print `True`. If not, verify your NVIDIA drivers and CUDA toolkit installation.
@@ -47,13 +47,7 @@ This should print `True`. If not, verify your NVIDIA drivers and CUDA toolkit in
 ## Running
 
 ```powershell
-transcribe
-```
-
-Or:
-
-```powershell
-python -m transcribe
+uv run transcribe
 ```
 
 The first run will download the Parakeet model (~1.5 GB). Subsequent runs use the cached model.
@@ -62,20 +56,22 @@ The first run will download the Parakeet model (~1.5 GB). Subsequent runs use th
 
 **Ctrl+Shift+;** (semicolon)
 
-Press to start recording, press again to stop. The transcribed text is pasted into the active application via Ctrl+V.
+Press to start recording, press again to stop. The transcribed text is pasted into the active application via Ctrl+V, and your previous clipboard contents are restored afterwards.
 
 ## Configuration
 
-Edit `transcribe.toml` in the repo root (copy `transcribe.toml.example` if you don't have one yet):
+All settings live in `transcribe.toml` in the repo root (copy `transcribe.toml.example` to start):
 
 ```toml
 model = "nvidia/parakeet-tdt-0.6b-v3"   # default; or "nvidia/parakeet-rnnt-1.1b" for higher accuracy
 hotkey = "ctrl+shift+;"                  # default
 ```
 
+See the [Configuration section in the README](../README.md#configuration) for the full reference — corrections, per-event notification control, and the TOML key-placement gotcha.
+
 ## Voice recognition corrections
 
-If the transcriber consistently gets certain words wrong, you can define corrections in `transcribe.toml`. See the [Configuration section in the README](../README.md#voice-recognition-corrections) for full details.
+Define `[replacements]` and `[custom_terms]` in `transcribe.toml` — see the [README](../README.md#voice-recognition-corrections) for full details.
 
 ## Model choices
 
@@ -83,6 +79,10 @@ If the transcriber consistently gets certain words wrong, you can define correct
 |---|---|---|---|
 | `nvidia/parakeet-tdt-0.6b-v3` (default) | ~2 GB | Fast | Good |
 | `nvidia/parakeet-rnnt-1.1b` | ~4 GB | Slower | Higher |
+
+## Networked mode
+
+The host/client split described in [NETWORK.md](NETWORK.md) is aimed at Linux and macOS: the client-only extras (`client-linux`, `client-macos`) and the client service installer do not cover Windows. A Windows machine with the full `windows` extra installed runs standalone.
 
 ## Troubleshooting
 
@@ -95,7 +95,7 @@ If the transcriber consistently gets certain words wrong, you can define correct
 
 ### Hotkey not working
 
-- Some applications running as Administrator may not receive hotkey events from a non-elevated process. Try running `transcribe` as Administrator.
+- Some applications running as Administrator may not receive hotkey events from a non-elevated process. Try running `uv run transcribe` from an elevated prompt.
 - Check that no other application has claimed the same hotkey combination.
 
 ### No audio input
