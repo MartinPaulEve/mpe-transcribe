@@ -1,3 +1,9 @@
+## 1.9.0 (2026-08-25)
+
+### Feat
+
+- **notifications**: per-event notification controls
+
 ## 1.8.1 (2026-08-24)
 
 ### Fix
