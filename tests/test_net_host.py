@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 
 from transcribe.config import NETWORK_DEFAULTS
 from transcribe.net import crypto, protocol
-from transcribe.net.host import Host
+from transcribe.net.host import TRANSCRIBING_GRACE_SECONDS, Host
 
 PSK = b"\x05" * 32
 KEY = crypto.derive_key(PSK)
@@ -508,3 +508,74 @@ class TestHostStub:
     def test_host_constructible(self):
         host, _, _, _, _ = make_host()
         assert host.state == "idle"
+
+
+class TestTranscribingWatchdog:
+    def _stuck_host(self, **overrides):
+        host, transport, clock, on_start, on_stop = make_host(
+            max_record_seconds=60, subscriber_ttl=100_000, **overrides
+        )
+        register(host, clock, CLIENT_A, "vm")
+        send_start(host, clock, CLIENT_A, "vm", "sess1")
+        send_stop(host, clock, CLIENT_A, "vm", "sess1")
+        assert host.state == "transcribing"
+        return host, transport, clock
+
+    def test_stuck_transcribing_resets_to_idle(self):
+        host, transport, clock = self._stuck_host()
+        clock.advance(60 + TRANSCRIBING_GRACE_SECONDS + 1)
+        host.tick()
+        assert host.state == "idle"
+        assert host.session is None
+
+    def test_transcribing_within_grace_is_untouched(self):
+        host, transport, clock = self._stuck_host()
+        clock.advance(60 + TRANSCRIBING_GRACE_SECONDS - 1)
+        host.tick()
+        assert host.state == "transcribing"
+        assert host.session == "sess1"
+
+    def test_watchdog_reset_broadcasts_error_then_idle(self):
+        host, transport, clock = self._stuck_host()
+        transport.sent.clear()
+        clock.advance(60 + TRANSCRIBING_GRACE_SECONDS + 1)
+        host.tick()
+        states = sent_of_type(transport, protocol.TYPE_STATE, CLIENT_A)
+        seen = [s[0]["state"] for s in states]
+        assert "error" in seen
+        assert seen[-1] == "idle"
+
+    def test_reset_host_accepts_a_new_session(self):
+        host, transport, clock = self._stuck_host()
+        clock.advance(60 + TRANSCRIBING_GRACE_SECONDS + 1)
+        host.tick()
+        clock.advance(2)
+        send_start(host, clock, CLIENT_A, "vm", "sess2")
+        assert host.state == "recording"
+        assert host.session == "sess2"
+
+    def test_stale_finish_does_not_kill_new_session(self):
+        host, transport, clock = self._stuck_host()
+        clock.advance(60 + TRANSCRIBING_GRACE_SECONDS + 1)
+        host.tick()
+        clock.advance(2)
+        send_start(host, clock, CLIENT_A, "vm", "sess2")
+        # a worker from the watchdogged session finishes late
+        host.finish_session(session="sess1")
+        assert host.state == "recording"
+        assert host.session == "sess2"
+
+
+class TestOnStopFailure:
+    def test_failing_on_stop_resets_to_idle(self):
+        host, transport, clock, _, on_stop = make_host()
+        on_stop.side_effect = RuntimeError("recorder wedged")
+        register(host, clock, CLIENT_A, "vm")
+        send_start(host, clock, CLIENT_A, "vm", "sess1")
+        send_stop(host, clock, CLIENT_A, "vm", "sess1")  # must not raise
+        assert host.state == "idle"
+        assert host.session is None
+        states = sent_of_type(transport, protocol.TYPE_STATE, CLIENT_A)
+        seen = [s[0]["state"] for s in states]
+        assert "error" in seen
+        assert seen[-1] == "idle"

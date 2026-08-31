@@ -3,10 +3,13 @@
 Pure logic behind an injected transport (sendto(data, addr)) and
 clock; no sockets here."""
 
+import logging
 import time
 import uuid
 
 from transcribe.net import crypto, protocol
+
+logger = logging.getLogger(__name__)
 
 REASSEMBLY_TIMEOUT = 10.0
 
@@ -92,6 +95,7 @@ class Client:
         if self._view is None or self._view == "idle":
             session = uuid.uuid4().hex
             self._own_session = session
+            logger.info("Hotkey: sending START (session %s)", session)
             self._send_reliable(
                 protocol.TYPE_START,
                 protocol.new_body(now, client=self._label, session=session),
@@ -99,11 +103,14 @@ class Client:
             )
         elif self._view == "recording":
             session = self._host_session or self._own_session
+            logger.info("Hotkey: sending STOP (session %s)", session)
             self._send_reliable(
                 protocol.TYPE_STOP,
                 protocol.new_body(now, client=self._label, session=session),
                 now,
             )
+        else:
+            logger.info("Hotkey ignored: host is %s", self._view)
 
     def tick(self) -> None:
         """Renew when due, retransmit unACKed reliable sends with
@@ -190,9 +197,21 @@ class Client:
 
     def _handle_state(self, body: dict, body_id: str, ts: float) -> None:
         now = self._clock()
-        if self._guard.check(body_id, ts, now) != "ok":
+        verdict = self._guard.check(body_id, ts, now)
+        if verdict == "stale":
+            logger.warning(
+                "Dropped stale STATE (ts off by %+.1fs; check clock sync)",
+                ts - now,
+            )
             return
-        self._view = body.get("state")
+        if verdict != "ok":
+            return
+        state = body.get("state")
+        if state != self._view:
+            logger.info(
+                "Host state: %s (session %s)", state, body.get("session")
+            )
+        self._view = state
         self._host_session = body.get("session")
         if self._on_state is not None:
             self._on_state(body)

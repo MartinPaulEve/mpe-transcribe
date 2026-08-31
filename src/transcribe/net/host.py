@@ -24,6 +24,10 @@ MAX_SUBSCRIBERS = 32
 # Minimum seconds between accepted STARTs (mic-thrash rate limit).
 START_RATE_LIMIT = 1.0
 
+# Extra seconds past max_record_seconds a session may sit in
+# "transcribing" before the watchdog force-resets it to idle.
+TRANSCRIBING_GRACE_SECONDS = 120.0
+
 
 class Host:
     """Authoritative session host bound to a fake-able transport."""
@@ -47,6 +51,8 @@ class Host:
         self._backoff = network["retry_backoff_ms"] / 1000.0
         # addr -> {"label": str, "last_seen": float}
         self._subscribers: dict = {}
+        # addr -> last stale-drop warning time (log throttling)
+        self._stale_warned: dict = {}
         # (addr, body id) -> {"data", "addr", "tries", "next_at"}
         self._pending: dict = {}
         # body ids we have ACKed, for re-ACKing duplicates
@@ -182,8 +188,16 @@ class Host:
             for body in bodies:
                 self._send_reliable(protocol.TYPE_TEXT, body, addr)
 
-    def finish_session(self) -> None:
-        """Return to idle and broadcast the terminal STATE."""
+    def finish_session(self, session: str | None = None) -> None:
+        """Return to idle and broadcast the terminal STATE.
+
+        With ``session`` given, only finishes if that session is
+        still the active one — a worker finishing late (after a
+        watchdog reset) must not kill a successor session.
+        """
+        if session is not None and session != self._session:
+            logger.info("Ignoring finish for expired session %s", session)
+            return
         self._state = "idle"
         self.publish_state()
         self._session = None
@@ -214,6 +228,7 @@ class Host:
             return
         verdict = self._guard.check(body_id, ts, now)
         if verdict == "stale":
+            self._warn_stale(msg_type, ts, now, addr)
             return
         if verdict == "duplicate":
             # Re-ACK duplicates of messages we already accepted so a
@@ -230,6 +245,21 @@ class Host:
         elif msg_type == protocol.TYPE_STOP:
             self._handle_stop(body, addr, now)
         # TYPE_AUDIO is reserved; TYPE_STATE/TEXT are host-outbound.
+
+    def _warn_stale(self, msg_type: int, ts, now: float, addr) -> None:
+        # Throttled per sender: a chronically skewed clock would
+        # otherwise warn on every heartbeat.
+        last = self._stale_warned.get(addr)
+        if last is not None and now - last < 5.0:
+            return
+        self._stale_warned[addr] = now
+        logger.warning(
+            "Dropped stale datagram type %d from %s "
+            "(ts off by %+.1fs; check clock sync)",
+            msg_type,
+            addr,
+            ts - now,
+        )
 
     def _touch_subscriber(self, addr, label, now: float) -> None:
         if addr not in self._subscribers:
@@ -279,7 +309,14 @@ class Host:
             # duplicate/retried START for the live session: idempotent
             self._ack(body["id"], addr)
         else:
-            # busy with another session: reject silently, sync sender
+            # busy with another session: reject, sync the sender
+            logger.info(
+                "Rejected START %s from %r: %s with session %s",
+                session,
+                label,
+                self._state,
+                self._session,
+            )
             body_out = protocol.new_body(
                 now,
                 state=self._state,
@@ -297,14 +334,28 @@ class Host:
         session = body.get("session")
         if self._state == "recording" and session == self._session:
             self._begin_transcribing()
-        # any other STOP is stale: ACKed (idempotent) but ignored
+        else:
+            # stale STOP: ACKed above (idempotent) but ignored
+            logger.info(
+                "Ignored STOP %s from %r (state %s, session %s)",
+                session,
+                label,
+                self._state,
+                self._session,
+            )
 
     def _begin_transcribing(self) -> None:
         self._state = "transcribing"
         self.publish_state()
         logger.info("Session %s stopping; transcribing", self._session)
         if self._on_stop is not None:
-            self._on_stop()
+            try:
+                self._on_stop()
+            except Exception:
+                logger.exception("Recording failed to stop")
+                self._state = "error"
+                self.publish_state()
+                self.finish_session()
 
     # -- periodic work ------------------------------------------------
 
@@ -325,6 +376,20 @@ class Host:
                 self._session,
             )
             self._begin_transcribing()
+        if (
+            self._state == "transcribing"
+            and self._started_at is not None
+            and now - self._started_at
+            >= self._network["max_record_seconds"] + TRANSCRIBING_GRACE_SECONDS
+        ):
+            # A stop or transcription worker has hung; a stuck
+            # session must never leave the host deaf until restart.
+            logger.error(
+                "Watchdog: session %s stuck transcribing; forcing idle",
+                self._session,
+            )
+            self.publish_state("error")
+            self.finish_session()
         for key in list(self._pending):
             entry = self._pending.get(key)
             if entry is None or now < entry["next_at"]:
