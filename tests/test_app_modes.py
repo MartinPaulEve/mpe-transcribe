@@ -1,5 +1,6 @@
 import base64
 import os
+import threading
 import time
 from unittest.mock import MagicMock, patch
 
@@ -123,6 +124,15 @@ def make_client_app(config=None, notifier=None, **net_overrides):
         mock_hk_factory,
         mock_trans_factory,
     )
+
+
+def wait_for(condition, timeout=5.0):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if condition():
+            return True
+        time.sleep(0.02)
+    return condition()
 
 
 def send_start(app, session="sess1", label="vm"):
@@ -261,6 +271,65 @@ class TestHostApp:
         assert len(texts) == 1
         assert inner.notifications == []
         assert inner.dings == 0
+
+    def test_network_stop_returns_before_recorder_finishes(self, mock_check):
+        app, transport, mock_rec, mock_trans, _, _, _ = make_host_app()
+        release = threading.Event()
+
+        def slow_stop():
+            release.wait(timeout=5)
+            return np.ones(16000, dtype=np.float32)
+
+        mock_rec.stop.side_effect = slow_stop
+        mock_trans.transcribe.return_value = "hello"
+        send_start(app)
+        started = time.monotonic()
+        send_stop(app)
+        elapsed = time.monotonic() - started
+        release.set()
+        assert elapsed < 1.0
+        assert wait_for(lambda: app.host.state == "idle")
+        texts = sent_of_type(transport, protocol.TYPE_TEXT, CLIENT_ADDR)
+        assert len(texts) == 1
+        assert protocol.join_message([texts[0][0]]) == "hello"
+
+    def test_recorder_stop_failure_recovers_to_idle(self, mock_check):
+        app, transport, mock_rec, mock_trans, _, _, _ = make_host_app()
+        mock_rec.stop.side_effect = RuntimeError("coreaudio wedged")
+        send_start(app)
+        send_stop(app)  # must not raise
+        assert wait_for(lambda: app.host.state == "idle")
+        assert sent_of_type(transport, protocol.TYPE_TEXT) == []
+        error_states = [
+            body
+            for body, _ in sent_of_type(transport, protocol.TYPE_STATE)
+            if body["state"] == "error"
+        ]
+        assert error_states
+
+    def test_text_for_expired_session_is_discarded(self, mock_check):
+        app, transport, mock_rec, mock_trans, _, _, _ = make_host_app(
+            deliver_to="all"
+        )
+        mock_rec.stop.return_value = np.ones(16000, dtype=np.float32)
+        release = threading.Event()
+
+        def slow_transcribe(audio, rate):
+            release.wait(timeout=5)
+            return "stale words"
+
+        mock_trans.transcribe.side_effect = slow_transcribe
+        send_start(app)
+        send_stop(app)
+        assert wait_for(lambda: app.host.state == "transcribing")
+        # the watchdog gives up on the session while it transcribes
+        with app._lock:
+            app.host.publish_state("error")
+            app.host.finish_session()
+        release.set()
+        time.sleep(0.3)
+        assert sent_of_type(transport, protocol.TYPE_TEXT) == []
+        assert app.host.state == "idle"
 
     def test_host_mode_without_key_refuses_to_start(self, mock_check):
         config = make_config("host")

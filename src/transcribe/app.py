@@ -302,7 +302,30 @@ class HostApp:
         logger.info("Recording started")
 
     def _stop_and_transcribe(self):
-        audio = self._recorder.stop()
+        # Runs on the network thread under the app lock: capture the
+        # session, then hand every blocking step (CoreAudio stream
+        # teardown, notifications, transcription) to a worker so a
+        # hang can never freeze the datagram loop.
+        local = self.host.initiator_addr is None
+        session = self.host.session
+        thread = threading.Thread(
+            target=self._finish_recording, args=(session, local)
+        )
+        thread.daemon = True
+        thread.start()
+
+    def _finish_recording(self, session: str, local: bool):
+        try:
+            audio = self._recorder.stop()
+        except Exception:
+            logger.exception("Recorder stop failed")
+            self._notifier.notify(
+                "Transcribe", "Recording error", event="error"
+            )
+            with self._lock:
+                self.host.publish_state("error")
+                self.host.finish_session(session=session)
+            return
         logger.info(
             "Captured %d samples (%.1fs)",
             len(audio),
@@ -312,7 +335,8 @@ class HostApp:
             self._notifier.notify(
                 "Transcribe", "Recording too short", event="error"
             )
-            self.host.finish_session()
+            with self._lock:
+                self.host.finish_session(session=session)
             return
         if _is_silent(audio):
             self._notifier.notify(
@@ -320,19 +344,15 @@ class HostApp:
                 "No audio detected — check mic permissions",
                 event="error",
             )
-            self.host.finish_session()
+            with self._lock:
+                self.host.finish_session(session=session)
             return
         self._notifier.notify_and_ding(
             "Transcribe", "Stopped — transcribing...", event="stopped"
         )
-        local = self.host.initiator_addr is None
-        thread = threading.Thread(
-            target=self._do_transcribe, args=(audio, local)
-        )
-        thread.daemon = True
-        thread.start()
+        self._do_transcribe(audio, session, local)
 
-    def _do_transcribe(self, audio, local: bool):
+    def _do_transcribe(self, audio, session: str, local: bool):
         try:
             text = self._transcriber.transcribe(audio, 16000)
             if text:
@@ -343,19 +363,30 @@ class HostApp:
                     threshold=self._config.get("custom_terms_threshold", 0.8),
                 )
             if text:
+                delivered = False
                 with self._lock:
-                    self.host.publish_text(text)
-                    if self._clipboard is not None and (
-                        local or self._network["also_paste_locally"]
-                    ):
-                        logger.info(
-                            "Pasting locally on the host too "
-                            "(local=%s also_paste_locally=%s)",
-                            local,
-                            self._network["also_paste_locally"],
+                    if self.host.session != session:
+                        logger.warning(
+                            "Discarding transcription for expired session %s",
+                            session,
                         )
-                        self._clipboard.paste_text(text)
-                self._notifier.notify("Transcribe", "Sent!", event="pasted")
+                    else:
+                        self.host.publish_text(text)
+                        if self._clipboard is not None and (
+                            local or self._network["also_paste_locally"]
+                        ):
+                            logger.info(
+                                "Pasting locally on the host too "
+                                "(local=%s also_paste_locally=%s)",
+                                local,
+                                self._network["also_paste_locally"],
+                            )
+                            self._clipboard.paste_text(text)
+                        delivered = True
+                if delivered:
+                    self._notifier.notify(
+                        "Transcribe", "Sent!", event="pasted"
+                    )
             else:
                 self._notifier.notify(
                     "Transcribe", "No speech detected", event="error"
@@ -366,10 +397,11 @@ class HostApp:
                 "Transcribe", "Transcription error", event="error"
             )
             with self._lock:
-                self.host.publish_state("error")
+                if self.host.session == session:
+                    self.host.publish_state("error")
         finally:
             with self._lock:
-                self.host.finish_session()
+                self.host.finish_session(session=session)
 
     def run(self):
         logging.basicConfig(
