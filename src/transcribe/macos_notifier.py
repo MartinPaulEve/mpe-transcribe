@@ -1,5 +1,9 @@
 import subprocess
 
+# Hard cap on any notification subprocess; a hung osascript must
+# never stall the app.
+SUBPROCESS_TIMEOUT = 5.0
+
 
 class MacOSNotifier:
     def notify(self, title: str, body: str):
@@ -11,6 +15,7 @@ class MacOSNotifier:
                     f'display notification "{body}" with title "{title}"',
                 ],
                 check=False,
+                timeout=SUBPROCESS_TIMEOUT,
             )
         except Exception:
             pass

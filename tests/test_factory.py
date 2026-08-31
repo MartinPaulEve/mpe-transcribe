@@ -79,17 +79,20 @@ class TestFactory:
 
     @patch("transcribe.factory.detect_session", return_value="x11")
     def test_create_notifier_linux(self, mock_detect):
-        from transcribe.notifier import AppNotifier
+        from transcribe.notifier import AppNotifier, AsyncNotifier
 
         n = create_notifier()
-        assert isinstance(n, AppNotifier)
+        assert isinstance(n, AsyncNotifier)
+        assert isinstance(n.inner, AppNotifier)
 
     @patch("transcribe.factory.detect_session", return_value="macos")
     def test_create_notifier_macos(self, mock_detect):
         from transcribe.macos_notifier import MacOSNotifier
+        from transcribe.notifier import AsyncNotifier
 
         n = create_notifier()
-        assert isinstance(n, MacOSNotifier)
+        assert isinstance(n, AsyncNotifier)
+        assert isinstance(n.inner, MacOSNotifier)
 
     @patch("transcribe.factory.detect_session", return_value="windows")
     def test_create_hotkey_listener_windows(self, mock_detect):
@@ -115,10 +118,12 @@ class TestFactory:
 
     @patch("transcribe.factory.detect_session", return_value="windows")
     def test_create_notifier_windows(self, mock_detect):
+        from transcribe.notifier import AsyncNotifier
         from transcribe.windows_notifier import WindowsNotifier
 
         n = create_notifier()
-        assert isinstance(n, WindowsNotifier)
+        assert isinstance(n, AsyncNotifier)
+        assert isinstance(n.inner, WindowsNotifier)
 
     @patch("transcribe.factory.detect_session", return_value="wayland")
     def test_create_clipboard_wayland_paste_method(self, mock_detect):
@@ -146,11 +151,14 @@ class TestFactory:
     def test_create_notifier_visual_off_keeps_ding(self, mock_detect):
         import sys
 
+        from tests.test_notifier import wait_until
+
         mock_sd = sys.modules["sounddevice"]
         mock_sd.reset_mock()
         n = create_notifier(visual=False)
         with patch("transcribe.notifier.subprocess.run") as mock_run:
             n.notify_and_ding("T", "B")
+            assert wait_until(lambda: mock_sd.play.called)
         mock_run.assert_not_called()
         mock_sd.play.assert_called_once()
 
@@ -174,8 +182,11 @@ class TestFactory:
 
         mock_sd = sys.modules["sounddevice"]
         mock_sd.reset_mock()
+        from tests.test_notifier import wait_until
+
         n = create_notifier(events={"ready": True})
         with patch("transcribe.notifier.subprocess.run") as mock_run:
             n.notify_and_ding("T", "B", event="ready")
+            assert wait_until(lambda: mock_run.called and mock_sd.play.called)
         mock_run.assert_called_once()
         mock_sd.play.assert_called_once()

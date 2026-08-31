@@ -96,6 +96,11 @@ def create_notifier(
         from transcribe.notifier import AppNotifier
 
         notifier = AppNotifier()
+    from transcribe.notifier import AsyncNotifier
+
+    # Platform notifiers shell out or touch audio devices; deliver
+    # from a worker so a hang can never block the network loops.
+    notifier = AsyncNotifier(notifier)
     if visual and sound and events is None:
         return notifier
     from transcribe.notifier import FilteredNotifier

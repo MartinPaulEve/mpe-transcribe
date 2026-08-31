@@ -1,3 +1,4 @@
+import subprocess
 import sys
 from unittest.mock import patch
 
@@ -34,6 +35,21 @@ class TestMacOSNotifier:
             notifier = MacOSNotifier()
             # Should not raise
             notifier.notify("Title", "Body")
+
+    def test_notify_bounds_subprocess_time(self):
+        with patch("transcribe.macos_notifier.subprocess.run") as mock_run:
+            notifier = MacOSNotifier()
+            notifier.notify("Title", "Body")
+            timeout = mock_run.call_args.kwargs.get("timeout")
+            assert timeout is not None and timeout > 0
+
+    def test_notify_survives_hung_osascript(self):
+        with patch(
+            "transcribe.macos_notifier.subprocess.run",
+            side_effect=subprocess.TimeoutExpired("osascript", 5),
+        ):
+            notifier = MacOSNotifier()
+            notifier.notify("Title", "Body")  # must not raise
 
     def test_ding_plays_tone(self):
         notifier = MacOSNotifier()

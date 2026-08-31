@@ -1,3 +1,4 @@
+import subprocess
 import sys
 from unittest.mock import patch
 
@@ -24,6 +25,21 @@ class TestWindowsNotifier:
             mock_sub.run.side_effect = Exception("powershell failed")
             notifier = WindowsNotifier()
             notifier.notify("Title", "Body")  # Should not raise
+
+    def test_notify_bounds_subprocess_time(self):
+        with patch("transcribe.windows_notifier.subprocess.run") as mock_run:
+            notifier = WindowsNotifier()
+            notifier.notify("Title", "Body")
+            timeout = mock_run.call_args.kwargs.get("timeout")
+            assert timeout is not None and timeout > 0
+
+    def test_notify_survives_hung_powershell(self):
+        with patch(
+            "transcribe.windows_notifier.subprocess.run",
+            side_effect=subprocess.TimeoutExpired("powershell", 5),
+        ):
+            notifier = WindowsNotifier()
+            notifier.notify("Title", "Body")  # must not raise
 
     def test_ding_plays_tone(self):
         notifier = WindowsNotifier()

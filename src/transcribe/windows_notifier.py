@@ -3,6 +3,10 @@ import subprocess
 import numpy as np
 import sounddevice as sd
 
+# Hard cap on any notification subprocess; a hung powershell must
+# never stall the app.
+SUBPROCESS_TIMEOUT = 5.0
+
 
 class WindowsNotifier:
     def notify(self, title: str, body: str):
@@ -33,6 +37,7 @@ class WindowsNotifier:
                 ["powershell", "-Command", ps_script],
                 check=False,
                 capture_output=True,
+                timeout=SUBPROCESS_TIMEOUT,
             )
         except Exception:
             pass
