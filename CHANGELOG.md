@@ -1,3 +1,11 @@
+## 1.9.1 (2026-08-31)
+
+### Fix
+
+- **app**: run the host stop pipeline off the network thread
+- **net**: watchdog for stuck sessions, stop-failure recovery, drop logging
+- **notifier**: async dispatch and subprocess timeouts
+
 ## 1.9.0 (2026-08-25)
 
 ### Feat
