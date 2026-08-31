@@ -1,3 +1,9 @@
+## 1.9.2 (2026-08-31)
+
+### Fix
+
+- **net**: bind the UDP port exclusively
+
 ## 1.9.1 (2026-08-31)
 
 ### Fix
