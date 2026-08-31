@@ -1,3 +1,9 @@
+## 1.10.0 (2026-08-31)
+
+### Feat
+
+- **scripts**: fix_mac.sh restores the dropped Parallels bridge route
+
 ## 1.9.2 (2026-08-31)
 
 ### Fix
