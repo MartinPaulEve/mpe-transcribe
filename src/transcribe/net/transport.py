@@ -17,8 +17,19 @@ class UdpTransport:
     ):
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         if bind is not None:
-            self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            self._sock.bind(bind)
+            # Deliberately no SO_REUSEADDR: UDP has no TIME_WAIT, and
+            # with it two instances can silently share the port (BSD
+            # and Linux both allow the double bind), splitting
+            # datagrams between them unpredictably. A duplicate
+            # instance must fail loudly instead.
+            try:
+                self._sock.bind(bind)
+            except OSError as exc:
+                self._sock.close()
+                raise OSError(
+                    f"cannot bind UDP {bind[0]}:{bind[1]} — is another "
+                    f"transcribe instance running? ({exc})"
+                ) from exc
         self._sock.settimeout(timeout)
 
     @property
