@@ -1,3 +1,9 @@
+## 1.10.2 (2026-10-10)
+
+### Fix
+
+- **macos**: play the ding through afplay so it follows the default output
+
 ## 1.10.1 (2026-10-10)
 
 ### Fix
