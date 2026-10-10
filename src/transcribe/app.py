@@ -4,6 +4,7 @@ import signal
 import threading
 from enum import Enum
 
+from transcribe.audio_devices import refresh_devices
 from transcribe.config import load_config, parse_hotkey, resolve_psk
 from transcribe.corrections import apply_corrections, build_whisper_prompt
 from transcribe.device_check import check_default_input_device
@@ -114,6 +115,9 @@ class TranscribeApp:
                 self._stop_and_transcribe()
 
     def _start_recording(self):
+        # Pick up devices connected since launch (or since the last
+        # session) before the beep is queued and the mic is opened.
+        refresh_devices()
         ok, msg = check_default_input_device()
         if not ok:
             logger.error("Device check failed: %s", msg)
@@ -290,6 +294,9 @@ class HostApp:
 
     def _start_recording(self):
         # Host callback: raising aborts the session cleanly.
+        # Pick up devices connected since launch (or since the last
+        # session) before the beep is queued and the mic is opened.
+        refresh_devices()
         ok, msg = check_default_input_device()
         if not ok:
             logger.error("Device check failed: %s", msg)

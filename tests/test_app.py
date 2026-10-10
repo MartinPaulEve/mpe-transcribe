@@ -1,8 +1,10 @@
+import sys
 import time
 from unittest.mock import MagicMock, patch
 
 import numpy as np
 
+from tests.fake_sounddevice import FakeSoundDevice
 from tests.test_notifier import RecordingNotifier
 from transcribe.app import AppState, TranscribeApp
 from transcribe.notifier import FilteredNotifier
@@ -324,3 +326,45 @@ class TestAppEventNotifications:
         mock_cb.paste_text.assert_called_once_with("hello")
         assert inner.notifications == []
         assert inner.dings == 0
+
+
+class TestAppFollowsDefaultDevices:
+    """A device plugged in after launch must be used for the beep and
+    the recording of the next session."""
+
+    TEST_CONFIG = {
+        "model": "nvidia/parakeet-tdt-0.6b-v3",
+        "hotkey": "ctrl+shift+;",
+        "replacements": {},
+        "custom_terms": [],
+        "custom_terms_threshold": 0.8,
+    }
+
+    def test_recording_start_uses_current_default_devices(self):
+        from transcribe.notifier import AppNotifier
+
+        fake = FakeSoundDevice("speaker")
+        with (
+            patch("transcribe.recorder.sd", fake),
+            patch.dict(sys.modules, {"sounddevice": fake}),
+            patch("transcribe.notifier.subprocess.run"),
+            patch(
+                "transcribe.app.check_default_input_device",
+                return_value=(True, ""),
+            ),
+            patch("transcribe.app.create_transcriber"),
+            patch("transcribe.app.create_hotkey_listener"),
+            patch(
+                "transcribe.app.create_notifier",
+                return_value=FilteredNotifier(AppNotifier()),
+            ),
+            patch("transcribe.app.create_clipboard"),
+        ):
+            app = TranscribeApp(config=self.TEST_CONFIG)
+            # Headset connected after the app loaded.
+            fake.system_default = "headphones"
+            app.toggle()
+        assert app.state == AppState.RECORDING
+        assert fake.played_on == ["headphones"]
+        assert fake.opened_on == ["headphones"]
+        assert fake.killed_streams == []

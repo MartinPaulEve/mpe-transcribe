@@ -166,6 +166,7 @@ IDLE ──[hotkey]──> RECORDING ──[hotkey]──> TRANSCRIBING ──[d
 | `corrections.py` | Post-transcription text corrections: exact replacements and fuzzy term matching |
 | `recorder.py` | 16 kHz mono audio capture via PortAudio |
 | `device_check.py` | Preflight check of the default input device before recording |
+| `audio_devices.py` | Re-scans PortAudio's devices at session start so the ding and the mic follow the current system defaults |
 | `transcriber.py` | Linux: NeMo Parakeet model inference |
 | `macos_transcriber.py` | macOS: mlx-whisper model inference |
 | `windows_transcriber.py` | Windows: NeMo Parakeet model inference |

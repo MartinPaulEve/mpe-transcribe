@@ -1,5 +1,6 @@
 import base64
 import os
+import sys
 import threading
 import time
 from unittest.mock import MagicMock, patch
@@ -7,6 +8,7 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
+from tests.fake_sounddevice import FakeSoundDevice
 from tests.test_notifier import RecordingNotifier
 from transcribe.app import ClientApp, HostApp, main
 from transcribe.config import NETWORK_DEFAULTS, ConfigError
@@ -524,3 +526,36 @@ class TestCli:
         passed = client_cls.call_args[0][0]
         assert passed["network"]["server_host"] == "192.168.1.9"
         assert passed["network"]["server_port"] == 48123
+
+
+@patch("transcribe.app.check_default_input_device", return_value=(True, ""))
+class TestHostAppFollowsDefaultDevices:
+    """A device plugged in after launch must be used for the beep and
+    the recording of the next session."""
+
+    def test_network_start_uses_current_default_devices(self, mock_check):
+        from transcribe.notifier import AppNotifier
+
+        fake = FakeSoundDevice("speaker")
+        transport = FakeTransport()
+        with (
+            patch("transcribe.recorder.sd", fake),
+            patch.dict(sys.modules, {"sounddevice": fake}),
+            patch("transcribe.notifier.subprocess.run"),
+            patch("transcribe.app.create_transcriber"),
+            patch("transcribe.app.create_hotkey_listener"),
+            patch(
+                "transcribe.app.create_notifier",
+                return_value=FilteredNotifier(AppNotifier()),
+            ),
+            patch("transcribe.app.create_clipboard"),
+            patch.dict(os.environ, {"TRANSCRIBE_PSK": PSK_B64}),
+        ):
+            app = HostApp(config=make_config("host"), transport=transport)
+            # Headset connected after the host loaded.
+            fake.system_default = "headphones"
+            send_start(app)
+        assert app.host.state == "recording"
+        assert fake.played_on == ["headphones"]
+        assert fake.opened_on == ["headphones"]
+        assert fake.killed_streams == []
