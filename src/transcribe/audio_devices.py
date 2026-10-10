@@ -33,3 +33,12 @@ def refresh_devices() -> None:
         sd._initialize()
     except Exception as exc:
         logger.warning("Audio device re-scan failed: %s", exc)
+        return
+    try:
+        logger.info(
+            "Audio devices re-scanned: input=%r output=%r",
+            sd.query_devices(kind="input")["name"],
+            sd.query_devices(kind="output")["name"],
+        )
+    except Exception as exc:
+        logger.info("Audio devices re-scanned (defaults unknown: %s)", exc)
