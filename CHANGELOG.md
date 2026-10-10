@@ -1,3 +1,9 @@
+## 1.10.1 (2026-10-10)
+
+### Fix
+
+- **audio**: re-scan devices at session start so the ding follows the default output
+
 ## 1.10.0 (2026-08-31)
 
 ### Feat
